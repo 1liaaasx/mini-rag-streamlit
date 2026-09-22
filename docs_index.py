@@ -11,7 +11,7 @@ import numpy as np
 
 
 INDEX_DIR = Path(__file__).resolve().parent / "index"
-MIN_SCORE = 0.20
+MIN_SCORE = 0.35
 TOP_K = 4
 API_TOKEN = re.compile(r"\b[A-Za-z_]\w*(?:\.[A-Za-z_]\w*){0,3}\b")
 
