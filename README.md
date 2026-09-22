@@ -93,11 +93,11 @@ Le script remplace les trois fichiers dans `index/` ensemble. Commitez-les et d�
 ## Fonctionnalités et limites
 
 - **Ask Documentation** : chat, nouvelles conversations, questions de suivi, actions « Simplify », « Give example », « Explain deeper ». Chacune relance la recherche FAISS avant Groq. Les conversations restent uniquement en mémoire de session.
-- **Langues** : interface en anglais, français ou Darija en alphabet latin (`translations.py`). La langue de la réponse se choisit séparément ; `Auto` demande au modèle de suivre la langue de la dernière question. Le résultat dépend du modèle.
-- **API Search** : recherche exacte dans les API indexées, sans appel Groq.
-- **Explain Code / Explain Error** : recherche documentaire sur le code ou le traceback, puis explication avec passages officiels. Pour un traceback propre à l'application de l'utilisateur, la documentation peut être insuffisante.
-- **Search documentation** : affiche directement les passages FAISS sans appel Groq.
-- **My Documents** : import PDF et index FAISS construit seulement quand le fichier change ; 10 Mo, 100 pages et 250 000 caractères maximum. Les scans nécessitent un OCR.
+- **Langues et réglages** : interface en anglais, français ou Darija en alphabet latin (`translations.py`). La langue de la réponse se choisit séparément ; `Auto` suit la langue de la dernière question. Le thème suit le système par défaut et peut être forcé en clair ou sombre. Le niveau d’explication (débutant, standard, avancé) change le style des réponses, pas les sources. Les choix restent disponibles pendant la session.
+- **API Search** : recherche exacte dans les API indexées, sans appel Groq. La fiche affiche la signature et les détails effectivement présents dans les métadonnées ; les champs absents ne sont pas complétés artificiellement.
+- **Explain Code / Explain Error** : prompts séparés et réponses concises. Le code est vérifié pour les erreurs de syntaxe sans exécution. Les deux modes recherchent leurs passages officiels avant génération ; la documentation peut être insuffisante pour un problème propre à l’application de l’utilisateur.
+- **Docs Search** : moteur de recherche qui affiche directement les passages FAISS et leurs liens officiels, sans appel Groq.
+- **My Documents** : import PDF, nombre de pages et passages ; index FAISS construit seulement quand le fichier change ; 10 Mo, 100 pages et 250 000 caractères maximum. Les scans nécessitent un OCR.
 - **Sources** : titre, module, version, extrait exact et URL issue des métadonnées officielles ; le lien ouvre la documentation Python.
 
 Le modèle d'embeddings est optimisé pour l'anglais ; les questions en français et Darija sans nom d'API peuvent retrouver des passages moins fiables. L'index couvre une sélection de pages Python 3.13 et non toute la documentation. La similarité minimale est heuristique. Sans clé Groq, la recherche d'API et la recherche documentaire directe fonctionnent, mais les réponses générées sont indisponibles.
