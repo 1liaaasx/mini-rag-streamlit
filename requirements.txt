@@ -4,3 +4,4 @@ pypdf>=6.19,<7
 sentence-transformers>=5.7,<7
 faiss-cpu>=1.14,<2
 numpy>=1.26,<3
+beautifulsoup4>=4.12,<5
