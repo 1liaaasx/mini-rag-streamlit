@@ -1,8 +1,10 @@
-"""Mini RAG : PDF → embeddings locaux → FAISS → réponse Groq."""
+"""RAG sur PDF : embeddings locaux, recherche FAISS et réponse Groq."""
 
 import hashlib
+import logging
 import os
 import re
+from html import escape
 from io import BytesIO
 
 import faiss
@@ -137,85 +139,258 @@ def answer_question(question, passages, api_key):
     return completion.choices[0].message.content or "Le modèle n'a pas renvoyé de réponse."
 
 
-st.set_page_config(page_title="Mini RAG PDF", page_icon="📄")
-st.title("📄 Questions sur un PDF")
-st.write("Importez un PDF, puis posez une question. Les réponses utilisent les passages retrouvés dans ce document.")
-
-uploaded_file = st.file_uploader("Choisir un PDF", type="pdf")
-
-if uploaded_file is None:
-    st.session_state.pop("document", None)
-    st.session_state.pop("result", None)
-    st.info("Ajoutez un PDF pour commencer.")
-    st.stop()
-
-pdf_bytes = uploaded_file.getvalue()
-if not pdf_bytes:
-    st.error("Le PDF est vide.")
-    st.stop()
-if len(pdf_bytes) > MAX_PDF_BYTES:
-    st.error("PDF trop volumineux : limite de 10 Mo.")
-    st.stop()
-
-pdf_hash = hashlib.sha256(pdf_bytes).hexdigest()
-if st.session_state.get("document", {}).get("hash") != pdf_hash:
-    st.session_state.pop("document", None)
-    st.session_state.pop("result", None)
-    try:
-        with st.spinner("Extraction du texte et création de l'index FAISS…"):
-            text = extract_text(pdf_bytes)
-            chunks = make_chunks(text)
-            if not chunks:
-                raise ValueError("Aucun texte extractible dans ce PDF. Les scans nécessitent un OCR.")
-            index = build_index(chunks)
-            st.session_state.document = {
-                "hash": pdf_hash,
-                "chunks": chunks,
-                "index": index,
+def inject_custom_css():
+    st.markdown(
+        """
+        <style>
+        :root { color-scheme: dark; }
+        html, body, .stApp {
+            background: #0B0F14;
+            color: #F5F7FA;
+            font-family: Inter, ui-sans-serif, system-ui, -apple-system,
+                BlinkMacSystemFont, "Segoe UI", sans-serif;
+        }
+        #MainMenu, footer, header[data-testid="stHeader"] { visibility: hidden; }
+        div[data-testid="stMainBlockContainer"] {
+            max-width: 1000px;
+            padding: 4.5rem 2rem 5rem;
+        }
+        .app-eyebrow {
+            color: #98A2B3; font-size: .76rem; font-weight: 600;
+            letter-spacing: .12em; text-transform: uppercase;
+        }
+        .app-title {
+            margin: .65rem 0 .7rem; color: #F5F7FA;
+            font-size: clamp(2.15rem, 5vw, 3.15rem);
+            font-weight: 650; line-height: 1.12; letter-spacing: -.04em;
+        }
+        .app-intro {
+            margin: 0; max-width: 650px; color: #B1BBC9;
+            font-size: 1.08rem; line-height: 1.7;
+        }
+        .app-steps {
+            margin: 1.15rem 0 2.1rem; color: #98A2B3;
+            font-size: .84rem; letter-spacing: .01em;
+        }
+        .st-key-upload_card, .st-key-question_card, .st-key-answer_card {
+            background: #151C26;
+            border: 1px solid #26303D !important;
+            border-radius: 16px !important;
+            padding: 1.4rem 1.55rem;
+            margin-bottom: 1.05rem;
+        }
+        .section-title {
+            margin: 0 0 .28rem; color: #F5F7FA;
+            font-size: 1.22rem; font-weight: 620; letter-spacing: -.02em;
+        }
+        .section-description {
+            margin: 0 0 1.15rem; color: #98A2B3;
+            font-size: .93rem; line-height: 1.55;
+        }
+        .empty-note {
+            margin: .7rem 0 0; color: #98A2B3;
+            font-size: .84rem;
+        }
+        .file-name {
+            overflow-wrap: anywhere; color: #F5F7FA;
+            font-size: .98rem; font-weight: 600;
+        }
+        .file-details {
+            margin-top: .3rem; color: #98A2B3; font-size: .84rem;
+        }
+        .ready-label {
+            display: inline-flex; align-items: center; gap: .55rem;
+            margin-top: 1rem; color: #BCEAD6;
+            font-size: .85rem; font-weight: 600;
+        }
+        .ready-dot {
+            width: .5rem; height: .5rem; border-radius: 50%;
+            background: #2EB67D;
+        }
+        .st-key-upload_card [data-testid="stFileUploaderDropzone"] {
+            background: #111720; border: 1px dashed #394555;
+            border-radius: 10px;
+        }
+        .st-key-upload_card [data-testid="stFileUploaderDropzone"]:hover {
+            border-color: #4F7CFF;
+        }
+        .st-key-question_card input {
+            background: #111720; color: #F5F7FA;
+            border: 1px solid #394555; border-radius: 9px;
+            min-height: 3rem;
+        }
+        .st-key-question_card input:focus {
+            border-color: #4F7CFF; box-shadow: 0 0 0 2px #4F7CFF33;
+        }
+        .st-key-question_card button[kind="primary"] {
+            background: #4F7CFF; border: 1px solid #4F7CFF;
+            border-radius: 9px; color: #FFFFFF; min-height: 3rem;
+            font-weight: 600;
+        }
+        .st-key-question_card button[kind="primary"]:hover {
+            background: #416DEB; border-color: #416DEB; color: #FFFFFF;
+        }
+        .st-key-answer_card [data-testid="stMarkdownContainer"] {
+            color: #E5EAF1; font-size: 1rem; line-height: 1.75;
+        }
+        .st-key-answer_card [data-testid="stMarkdownContainer"] p,
+        .st-key-answer_card [data-testid="stMarkdownContainer"] li {
+            line-height: 1.75;
+        }
+        .st-key-answer_card [data-testid="stExpander"] {
+            background: #111720; border: 1px solid #26303D;
+            border-radius: 9px; margin-top: .7rem;
+        }
+        div[data-testid="stAlert"] { border-radius: 9px; }
+        @media (max-width: 640px) {
+            div[data-testid="stMainBlockContainer"] {
+                padding: 2.6rem 1rem 3rem;
             }
-    except ValueError as exc:
-        st.error(str(exc))
+            .st-key-upload_card, .st-key-question_card, .st-key-answer_card {
+                padding: 1.1rem 1rem;
+            }
+            .app-steps { margin-bottom: 1.55rem; }
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_header():
+    st.markdown(
+        """
+        <div class="app-eyebrow">Espace documentaire</div>
+        <h1 class="app-title">Document Q&amp;A</h1>
+        <p class="app-intro">Interrogez vos documents et obtenez des réponses
+        basées sur leur contenu.</p>
+        <p class="app-steps">PDF · Recherche sémantique · Réponses contextualisées</p>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_document_status(name, size_bytes, passage_count):
+    file_name = escape(name)
+    file_size = f"{size_bytes / (1024 * 1024):.1f}".replace(".", ",")
+    st.markdown(
+        f"""
+        <div class="file-name">{file_name}</div>
+        <div class="file-details">{passage_count} passages · {file_size} Mo</div>
+        <div class="ready-label"><span class="ready-dot"></span>Document prêt</div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_answer(result):
+    with st.container(border=True, key="answer_card"):
+        st.markdown('<h2 class="section-title">Réponse</h2>', unsafe_allow_html=True)
+        st.markdown(result["answer"])
+        with st.expander("Sources utilisées"):
+            for number, (passage, score) in enumerate(result["passages"], start=1):
+                st.markdown(f"**Passage {number}** · similarité {score:.2f}")
+                st.write(passage)
+
+
+st.set_page_config(page_title="Document Q&A", layout="centered", initial_sidebar_state="collapsed")
+inject_custom_css()
+render_header()
+
+with st.container(border=True, key="upload_card"):
+    st.markdown('<h2 class="section-title">Ajouter un document</h2>', unsafe_allow_html=True)
+    st.markdown(
+        '<p class="section-description">Importez un fichier PDF pour commencer.</p>',
+        unsafe_allow_html=True,
+    )
+    uploaded_file = st.file_uploader("Fichier PDF", type="pdf", label_visibility="collapsed")
+
+    if uploaded_file is None:
+        st.session_state.pop("document", None)
+        st.session_state.pop("result", None)
+        st.markdown(
+            '<p class="empty-note">Votre document reste disponible pendant cette session.</p>',
+            unsafe_allow_html=True,
+        )
         st.stop()
-    except Exception as exc:
-        st.error(f"Lecture du PDF ou création des embeddings impossible : {exc}")
+
+    pdf_bytes = uploaded_file.getvalue()
+    if not pdf_bytes:
+        st.error("Le PDF est vide.")
+        st.stop()
+    if len(pdf_bytes) > MAX_PDF_BYTES:
+        st.error("Ce PDF dépasse la limite de 10 Mo.")
         st.stop()
 
-document = st.session_state.document
-st.success(f"PDF chargé et indexé : {uploaded_file.name} ({len(document['chunks'])} passages).")
+    pdf_hash = hashlib.sha256(pdf_bytes).hexdigest()
+    if st.session_state.get("document", {}).get("hash") != pdf_hash:
+        st.session_state.pop("document", None)
+        st.session_state.pop("result", None)
+        try:
+            with st.spinner("Préparation du document…"):
+                text = extract_text(pdf_bytes)
+                chunks = make_chunks(text)
+                if not chunks:
+                    raise ValueError("Aucun texte extractible. Les PDF scannés nécessitent un OCR.")
+                index = build_index(chunks)
+                st.session_state.document = {
+                    "hash": pdf_hash,
+                    "chunks": chunks,
+                    "index": index,
+                }
+        except ValueError as exc:
+            st.error(str(exc))
+            st.stop()
+        except Exception:
+            logging.exception("Impossible de préparer le document")
+            st.error("Impossible de préparer ce PDF. Vérifiez qu'il contient du texte exploitable.")
+            st.stop()
 
-with st.form("question_form"):
-    question = st.text_input("Votre question sur ce PDF")
-    submitted = st.form_submit_button("Poser la question")
+    document = st.session_state.document
+    render_document_status(uploaded_file.name, len(pdf_bytes), len(document["chunks"]))
 
-if submitted:
-    st.session_state.pop("result", None)
-    if not question.strip():
-        st.warning("Saisissez une question avant de lancer la recherche.")
-    else:
-        api_key = get_groq_api_key()
-        if not api_key:
-            st.error("Clé GROQ_API_KEY absente : configurez un Secret Streamlit ou une variable d'environnement.")
+with st.container(border=True, key="question_card"):
+    st.markdown('<h2 class="section-title">Posez une question</h2>', unsafe_allow_html=True)
+    st.markdown(
+        '<p class="section-description">La réponse sera basée uniquement sur le contenu du document.</p>',
+        unsafe_allow_html=True,
+    )
+    with st.form("question_form", enter_to_submit=True, border=False):
+        question = st.text_input(
+            "Votre question",
+            placeholder="Ex. Quels sont les objectifs principaux de ce document ?",
+            label_visibility="collapsed",
+        )
+        submitted = st.form_submit_button(
+            "Obtenir une réponse", type="primary", use_container_width=True
+        )
+
+    if submitted:
+        st.session_state.pop("result", None)
+        if not question.strip():
+            st.warning("Saisissez une question pour continuer.")
         else:
-            try:
-                with st.spinner("Recherche des passages pertinents…"):
-                    passages = retrieve(question.strip(), document["index"], document["chunks"])
-            except Exception as exc:
-                st.error(f"Recherche vectorielle impossible : {exc}")
+            api_key = get_groq_api_key()
+            if not api_key:
+                st.error("Clé Groq manquante. Configurez GROQ_API_KEY dans les Secrets.")
             else:
-                if not passages:
-                    st.warning("Aucun passage suffisamment pertinent trouvé dans ce document.")
+                try:
+                    with st.spinner("Recherche dans le document…"):
+                        passages = retrieve(question.strip(), document["index"], document["chunks"])
+                except Exception:
+                    logging.exception("Recherche vectorielle impossible")
+                    st.error("La recherche dans le document a échoué. Réessayez.")
                 else:
-                    try:
-                        with st.spinner("Génération de la réponse avec Groq…"):
-                            answer = answer_question(question.strip(), passages, api_key)
-                        st.session_state.result = {"answer": answer, "passages": passages}
-                    except Exception as exc:
-                        st.error(f"Erreur lors de l'appel à Groq : {exc}")
+                    if not passages:
+                        st.warning("Aucun passage suffisamment pertinent trouvé dans ce document.")
+                    else:
+                        try:
+                            with st.spinner("Génération de la réponse…"):
+                                answer = answer_question(question.strip(), passages, api_key)
+                            st.session_state.result = {"answer": answer, "passages": passages}
+                        except Exception:
+                            logging.exception("Appel Groq impossible")
+                            st.error("La réponse n'a pas pu être générée. Réessayez dans un instant.")
 
 if "result" in st.session_state:
-    st.subheader("Réponse")
-    st.write(st.session_state.result["answer"])
-    with st.expander("Voir les sources / passages utilisés"):
-        for number, (passage, score) in enumerate(st.session_state.result["passages"], start=1):
-            st.markdown(f"**Passage {number}** — similarité : {score:.2f}")
-            st.write(passage)
+    render_answer(st.session_state.result)
