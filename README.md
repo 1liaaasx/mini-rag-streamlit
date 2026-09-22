@@ -96,5 +96,5 @@ Le script remplace les trois fichiers dans `index/` ensemble. Commitez-les et d�
 - **API Search** : recherche exacte de l'API présente dans l'index (`json.loads`, `asyncio.gather`, etc.). Les API absentes de la sélection ne sont pas inventées.
 - **My Documents** : mode secondaire reprenant l'import PDF, les chunks, embeddings FAISS et réponse Groq ; PDF limité à 10 Mo, 100 pages et 250 000 caractères. Les scans nécessitent un OCR.
 - Les embeddings choisis sont optimisés pour l'anglais. Une question française contenant un nom d'API précis bénéficie d'une recherche directe de cette API ; les requêtes françaises purement conceptuelles peuvent être moins fiables.
-- Le seuil de similarité `0.20` est heuristique ; une réponse sans passage pertinent est refusée. Le prompt réduit les hallucinations sans les éliminer.
+- Le seuil de similarité `0.35` est heuristique ; une réponse sans passage pertinent est refusée. Le prompt réduit les hallucinations sans les éliminer.
 - **Reporté** : Explain Code, Explain Error et autres langages/versions. L'interface ne les affiche pas comme fonctionnalités actives.
