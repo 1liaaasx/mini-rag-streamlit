@@ -1,6 +1,6 @@
 # DocQuery
 
-**Developer documentation, explained.** Une application RAG pour explorer une **sélection** de 27 pages de la documentation officielle Python 3.13. Posez une question, consultez les extraits utilisés, recherchez une API précise ou interrogez votre propre PDF dans un mode secondaire.
+**Developer documentation, explained.** Une application RAG pour explorer une **sélection** de 27 pages de la documentation officielle Python 3.13. Posez une question, consultez les extraits utilisés, recherchez une API précise, expliquez du code ou une erreur, ou interrogez votre propre PDF.
 
 Le projet n'indexe **pas l'intégralité** de la documentation Python. Les pages retenues couvrent notamment les fonctions et types intégrés, les exceptions, `pathlib`, `json`, `asyncio`, `contextlib`, `os`, `re`, `typing`, `datetime`, ainsi que quelques sections du tutoriel et de la référence du langage. La liste exacte est dans `build_index.py`.
 
@@ -19,7 +19,7 @@ Question → nouvel embedding → recherche FAISS → 4 passages au plus
 
 `build_index.py` prépare l'index **une fois**, en téléchargeant l'archive HTML de [docs.python.org](https://docs.python.org/3.13/download.html). L'application lit les fichiers déjà préparés au démarrage ; elle ne télécharge pas la documentation et ne recalcule pas ses embeddings à chaque question. Les citations `[1]`, `[2]` ne peuvent pointer que vers les passages réellement transmis au modèle. Une citation numérotée n'est toutefois pas une garantie que la phrase associée est exacte : consultez le lien officiel.
 
-Les questions de suivi utilisent la dernière question pour lever une ambiguïté, puis lancent **une nouvelle recherche** dans FAISS. La recherche d'API est déterministe et utilise les noms/URLs des métadonnées, sans appel Groq.
+Les questions de suivi utilisent la dernière question pour lever une ambiguïté, puis lancent **une nouvelle recherche** dans FAISS. Chaque conversation est conservée dans `st.session_state` pour la durée de la session ; elle disparaît à la fermeture de celle-ci. La recherche d'API est déterministe et utilise les noms/URLs des métadonnées, sans appel Groq.
 
 ## Stack
 
@@ -92,9 +92,14 @@ Le script remplace les trois fichiers dans `index/` ensemble. Commitez-les et d�
 
 ## Fonctionnalités et limites
 
-- **Ask Documentation** : question, conversation de session, question de suivi, passages officiels et exemple Python quand il est utile et étayé.
-- **API Search** : recherche exacte de l'API présente dans l'index (`json.loads`, `asyncio.gather`, etc.). Les API absentes de la sélection ne sont pas inventées.
-- **My Documents** : mode secondaire reprenant l'import PDF, les chunks, embeddings FAISS et réponse Groq ; PDF limité à 10 Mo, 100 pages et 250 000 caractères. Les scans nécessitent un OCR.
-- Les embeddings choisis sont optimisés pour l'anglais. Une question française contenant un nom d'API précis bénéficie d'une recherche directe de cette API ; les requêtes françaises purement conceptuelles peuvent être moins fiables.
-- Le seuil de similarité `0.35` est heuristique ; une réponse sans passage pertinent est refusée. Le prompt réduit les hallucinations sans les éliminer.
-- **Reporté** : Explain Code, Explain Error et autres langages/versions. L'interface ne les affiche pas comme fonctionnalités actives.
+- **Ask Documentation** : chat, nouvelles conversations, questions de suivi, actions « Simplify », « Give example », « Explain deeper ». Chacune relance la recherche FAISS avant Groq. Les conversations restent uniquement en mémoire de session.
+- **Langues** : interface en anglais, français ou Darija en alphabet latin (`translations.py`). La langue de la réponse se choisit séparément ; `Auto` demande au modèle de suivre la langue de la dernière question. Le résultat dépend du modèle.
+- **API Search** : recherche exacte dans les API indexées, sans appel Groq.
+- **Explain Code / Explain Error** : recherche documentaire sur le code ou le traceback, puis explication avec passages officiels. Pour un traceback propre à l'application de l'utilisateur, la documentation peut être insuffisante.
+- **Search documentation** : affiche directement les passages FAISS sans appel Groq.
+- **My Documents** : import PDF et index FAISS construit seulement quand le fichier change ; 10 Mo, 100 pages et 250 000 caractères maximum. Les scans nécessitent un OCR.
+- **Sources** : titre, module, version, extrait exact et URL issue des métadonnées officielles ; le lien ouvre la documentation Python.
+
+Le modèle d'embeddings est optimisé pour l'anglais ; les questions en français et Darija sans nom d'API peuvent retrouver des passages moins fiables. L'index couvre une sélection de pages Python 3.13 et non toute la documentation. La similarité minimale est heuristique. Sans clé Groq, la recherche d'API et la recherche documentaire directe fonctionnent, mais les réponses générées sont indisponibles.
+
+Les options **favoris**, **Darija en alphabet arabe** et l'export des conversations restent à faire. Aucun appel Groq n'est consacré aux traductions de l'interface.
