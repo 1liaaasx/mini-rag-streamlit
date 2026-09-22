@@ -14,7 +14,8 @@ def inject_custom_css():
             font-family: Inter, ui-sans-serif, system-ui, -apple-system,
                 BlinkMacSystemFont, "Segoe UI", sans-serif;
         }
-        #MainMenu, footer, header[data-testid="stHeader"] { visibility: hidden; }
+        #MainMenu, footer { visibility: hidden; }
+        header[data-testid="stHeader"] { background: transparent; }
         div[data-testid="stMainBlockContainer"] {
             max-width: 1050px;
             padding: 3.5rem 2rem 5rem;
@@ -137,4 +138,3 @@ def inject_custom_css():
         """,
         unsafe_allow_html=True,
     )
-
