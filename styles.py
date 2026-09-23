@@ -158,6 +158,12 @@ def inject_custom_css(theme):
         background:var(--surface-soft)!important;color:var(--text)!important;
         border:1px solid var(--border)!important;}}
     section[data-testid="stSidebar"] [class*="st-key-sidebar_settings"] {{margin-top:1rem;}}
+    section[data-testid="stSidebar"] [class*="st-key-logout"] button {{width:100%;min-height:34px;
+        margin-top:.25rem;padding:.25rem .7rem;text-align:left;background:transparent!important;
+        color:var(--text-secondary)!important;border:0!important;border-radius:8px!important;
+        font-size:.84rem;font-weight:500;}}
+    section[data-testid="stSidebar"] [class*="st-key-logout"] button:hover {{
+        background:var(--surface-hover)!important;color:var(--text)!important;}}
     section[data-testid="stSidebar"] [data-testid="stPopover"]>button {{min-height:30px;
         padding:0 .45rem;background:transparent!important;border-color:transparent!important;
         color:var(--text-secondary)!important;}}
@@ -190,6 +196,21 @@ def inject_custom_css(theme):
         font-size:1rem;line-height:1.65;}}
     .conversation-heading {{margin:0 0 1.25rem;color:var(--text-secondary);
         font-size:.82rem;font-weight:650;}}
+
+    /* Login */
+    [class*="st-key-login_page"] {{width:100%;max-width:460px;margin:clamp(2rem,9vh,6rem) auto 0;}}
+    [class*="st-key-login_card"] {{padding:clamp(1.5rem,5vw,2.4rem);background:var(--surface);
+        border:1px solid var(--border);border-radius:24px;box-shadow:var(--shadow);}}
+    .login-brand {{margin-bottom:2rem;color:var(--text);font-size:1.12rem;font-weight:760;
+        letter-spacing:-.035em;}}
+    .login-brand span {{margin-left:.35rem;color:var(--accent);font-size:.7rem;vertical-align:top;}}
+    .login-title {{margin:0 0 .5rem;color:var(--text);font-size:clamp(1.8rem,5vw,2.35rem);
+        line-height:1.15;letter-spacing:-.04em;}}
+    .login-intro {{margin:0 0 1.6rem;color:var(--text-secondary);line-height:1.6;}}
+    [class*="st-key-login_card"] [data-testid="stForm"] {{padding:0;border:0;}}
+    [class*="st-key-login_card"] .stFormSubmitButton>button {{width:100%;margin-top:.65rem;}}
+    [class*="st-key-login_language"] {{max-width:180px;margin:1rem auto 0;}}
+    [class*="st-key-login_language"] [data-testid="stSelectbox"] label {{display:none;}}
 
     /* Chips et actions Ghost */
     [class*="st-key-suggestion_chips"] [data-testid="stHorizontalBlock"],
@@ -313,6 +334,8 @@ def inject_custom_css(theme):
         [data-testid="stBottomBlockContainer"] {{padding:.5rem .55rem .7rem!important;}}
         .app-title {{font-size:2rem;}}.app-intro {{margin-bottom:1.2rem;}}
         .composer-chip {{padding:0 7px;margin-right:.2rem;font-size:.67rem;}}
+        [class*="st-key-login_page"] {{margin-top:1.25rem;}}
+        [class*="st-key-login_card"] {{padding:1.35rem;border-radius:18px;}}
     }}
     </style>
     """, unsafe_allow_html=True)

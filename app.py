@@ -1,6 +1,7 @@
 """RAG sur PDF : embeddings locaux, recherche FAISS et réponse Groq."""
 
 import hashlib
+import hmac
 import importlib
 import os
 import re
@@ -61,13 +62,18 @@ def get_embedding_model():
     return SentenceTransformer(MODEL_NAME)
 
 
+def get_config_value(name):
+    """Lit un secret Streamlit, puis la variable d'environnement correspondante."""
+    try:
+        value = st.secrets[name]
+    except (FileNotFoundError, KeyError):
+        value = None
+    return str(value or os.environ.get(name, "")).strip()
+
+
 def get_groq_api_key():
     """Utilise les Secrets Streamlit, puis une variable d'environnement locale."""
-    try:
-        key = st.secrets["GROQ_API_KEY"]
-    except (FileNotFoundError, KeyError):
-        key = None
-    return (key or os.environ.get("GROQ_API_KEY", "")).strip()
+    return get_config_value("GROQ_API_KEY")
 
 
 def extract_text(pdf_bytes, with_page_count=False):
@@ -888,6 +894,73 @@ def show_settings(language):
             st.caption(t("show_sources_help", language))
 
 
+def login_credentials():
+    """Retourne le compte unique configuré sans fournir de valeur par défaut."""
+    return get_config_value("LOGIN_USERNAME"), get_config_value("LOGIN_PASSWORD")
+
+
+def logout():
+    """Ferme la session en conservant uniquement les préférences d'interface."""
+    preferences = {
+        key: st.session_state.get(key)
+        for key in ("ui_language", "answer_language", "explanation_level", "code_examples",
+                    "show_sources", "theme", "python_version")
+        if key in st.session_state
+    }
+    st.session_state.clear()
+    st.session_state.update(preferences)
+    st.session_state.authenticated = False
+
+
+def attempt_login():
+    """Valide le formulaire avant le rerun et retire le mot de passe de la session."""
+    username, password = login_credentials()
+    entered_username = st.session_state.get("login_username", "")
+    entered_password = st.session_state.get("login_password", "")
+    valid_username = bool(username) and hmac.compare_digest(entered_username, username)
+    valid_password = bool(password) and hmac.compare_digest(entered_password, password)
+    st.session_state.authenticated = valid_username and valid_password
+    st.session_state.login_failed = not st.session_state.authenticated
+    st.session_state.pop("login_password", None)
+
+
+def render_login():
+    """Affiche la porte d'entrée de l'application et valide le compte configuré."""
+    language = st.session_state.ui_language
+    username, password = login_credentials()
+    with st.container(key="login_page"):
+        with st.container(key="login_card"):
+            st.markdown('<div class="login-brand">DocQuery<span>✦</span></div>',
+                        unsafe_allow_html=True)
+            st.markdown(
+                f'<h1 class="login-title">{escape(t("login_title", language))}</h1>'
+                f'<p class="login-intro">{escape(t("login_intro", language))}</p>',
+                unsafe_allow_html=True,
+            )
+            if not username or not password:
+                st.error(t("login_configuration_missing", language))
+            with st.form("login_form", border=False):
+                st.text_input(
+                    t("username", language), key="login_username", autocomplete="username",
+                )
+                st.text_input(
+                    t("password", language), type="password", key="login_password",
+                    autocomplete="current-password",
+                )
+                st.form_submit_button(
+                    t("sign_in", language), type="primary", use_container_width=True,
+                    disabled=not username or not password,
+                    on_click=attempt_login,
+                )
+            if st.session_state.pop("login_failed", False):
+                st.error(t("invalid_login", language))
+        with st.container(key="login_language"):
+            st.selectbox(
+                t("interface", language), list(LANGUAGES), format_func=LANGUAGES.get,
+                key="ui_language", label_visibility="collapsed",
+            )
+
+
 st.set_page_config(page_title="DocQuery", layout="wide", initial_sidebar_state="auto")
 st.session_state.setdefault("ui_language", "en")
 st.session_state.setdefault("answer_language", "Auto")
@@ -900,7 +973,12 @@ st.session_state.setdefault("mode", "ask")
 st.session_state.setdefault("current_chat", 0)
 st.session_state.setdefault("composer_text", "")
 st.session_state.setdefault("pdf_composer_text", "")
+st.session_state.setdefault("authenticated", False)
 inject_custom_css(st.session_state.theme)
+
+if not st.session_state.authenticated:
+    render_login()
+    st.stop()
 
 with st.sidebar:
     st.markdown('<div class="sidebar-brand">DocQuery<span class="brand-mark">✦</span></div>',
@@ -947,6 +1025,8 @@ with st.sidebar:
     if st.button(t("settings", language), key="sidebar_settings"):
         st.session_state.mode = "settings"
         st.rerun()
+    st.button(t("logout", language), key="logout", on_click=logout,
+              use_container_width=True)
 
 language = st.session_state.ui_language
 mode = st.session_state.mode
