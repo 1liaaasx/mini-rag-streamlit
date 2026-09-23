@@ -3,6 +3,7 @@
 import hashlib
 import os
 import re
+import uuid
 from html import escape
 from io import BytesIO
 
@@ -114,7 +115,8 @@ def retrieve(question, index, chunks):
     ]
 
 
-def answer_question(question, passages, api_key, answer_language="Auto", level="Standard"):
+def answer_question(question, passages, api_key, answer_language="Auto", level="Standard",
+                    code_examples=True):
     context = "\n\n".join(
         f"[Passage {number}] {text}"
         for number, (text, _score) in enumerate(passages, start=1)
@@ -134,6 +136,8 @@ def answer_question(question, passages, api_key, answer_language="Auto", level="
                     "Réponds d'abord à la question, puis ajoute des détails seulement si utiles. "
                     + ("Réponds dans la langue de la question. " if answer_language == "Auto"
                        else f"Réponds en {answer_language}. ")
+                    + ("Les exemples de code sont facultatifs. " if code_examples else
+                       "N'ajoute pas d'exemple de code facultatif. ")
                     + {"Beginner": "Utilise des mots simples.",
                        "Standard": "Sois concis.",
                        "Advanced": "Ajoute des précisions techniques utiles."}[level]
@@ -148,13 +152,14 @@ def answer_question(question, passages, api_key, answer_language="Auto", level="
     return completion.choices[0].message.content or "Le modèle n'a pas renvoyé de réponse."
 
 
-CATALOG = {"Python": ("3.13",)}
-SUGGESTIONS = (
-    "How do I read a JSON file?",
-    "What is the difference between list and tuple?",
-    "How does asyncio.gather() work?",
-    "How do context managers work?",
-)
+SUGGESTIONS = {
+    "en": ("How do I read JSON?", "How does asyncio.gather() work?",
+           "Explain Python decorators", "How do context managers work?"),
+    "fr": ("Comment lire du JSON ?", "Comment fonctionne asyncio.gather() ?",
+           "Explique les décorateurs Python", "Comment fonctionnent les context managers ?"),
+    "darija": ("Kifach nqra JSON?", "Kifach katkhdem asyncio.gather()?",
+               "Chra7 decorators f Python", "Kifach kaykhdmo context managers?"),
+}
 CODE_BLOCK = re.compile(r"```(?:python)?\s*\n(.*?)```", re.I | re.S)
 
 
@@ -173,35 +178,44 @@ def code_diagnostic(code):
     return ""
 
 
-def documentation_prompt(task, level):
+def documentation_prompt(task, level, code_examples=True):
     """Prompts distincts : un extrait de code n'est pas un traceback."""
     style = {
         "Beginner": "Use simple terms and a minimal example. Avoid jargon.",
         "Standard": "Give a direct answer first. Aim for 80-140 words; skip unnecessary tables.",
         "Advanced": "Give the answer first, then useful technical details and edge cases.",
     }[level]
-    if task == "code":
+    example_rule = ("Add a minimal code example only if useful. " if code_examples else
+                    "Do not add optional code examples. Corrected code is still allowed. ")
+    if task in ("code", "fix"):
+        if task == "fix":
+            return ("The user's code has a syntax problem. First show the minimal corrected "
+                    "version in one Python code block, then explain the change briefly. "
+                    "Do not execute code. Do not alter unrelated behavior. " + style)
         return ("You are explaining Python SOURCE CODE, not an exception or traceback. "
                 "Start with 'Overview'. If you detect a real problem, add 'Issues' and "
                 "'Corrected code', then a brief 'Explanation'. If no issue exists, "
                 "omit those sections. Never use traceback headings unless the user "
-                "actually supplied a traceback. Preserve original code and identifiers. " + style)
+                "actually supplied a traceback. Preserve original code and identifiers. "
+                + example_rule + style)
     if task == "error":
         return ("You are explaining an error or traceback. Use short headings "
-                "'What happened', 'Likely cause', 'How to fix it'. Only add a small "
-                "'Example' if useful. Do not claim to know the exact cause without "
+                "'Likely cause' and 'How to fix it' first. Add 'Why this happens' "
+                "only when needed. Add a small example only if useful. "
+                "Do not claim to know the exact cause without "
                 "supporting input. For a simple syntax error, give Problem, Fix, Why "
-                "in a few lines. " + style)
+                "in a few lines. " + example_rule + style)
     action = {
         "simplify": "Explain the answer more simply.",
         "example": "Give one small example supported by the retrieved documentation.",
         "deeper": "Explain the topic in more detail where the evidence supports it.",
+        "regenerate": "Write a fresh, concise answer from the newly retrieved passages.",
     }.get(task, "Answer the question concisely. Add code only if helpful.")
-    return action + " " + style
+    return action + " " + example_rule + style
 
 
 def answer_docs(question, passages, api_key, previous_question="", answer_language="Auto",
-                task="ask", level="Standard"):
+                task="ask", level="Standard", code_examples=True):
     """Groq reçoit uniquement les passages retrouvés pour cette question."""
     context = "\n\n".join(
         f"[{number}] {item['title']} — {item['section']}\n"
@@ -210,8 +224,9 @@ def answer_docs(question, passages, api_key, previous_question="", answer_langua
     )
     previous = (f"Previous question for resolving references only: {previous_question}\n"
                 if previous_question and task not in ("code", "error") else "")
-    diagnostic = (f"Static syntax check (no code was run): {code_diagnostic(question)}\n"
-                  if task == "code" and code_diagnostic(question) else "")
+    diagnostic_text = code_diagnostic(question) if task in ("code", "fix") else ""
+    diagnostic = (f"Static syntax check (no code was run): {diagnostic_text}\n"
+                  if diagnostic_text else "")
     language_rule = ("Detect the language of the latest user input (English, French "
                      "or Moroccan Darija) and answer in that language."
                      if answer_language == "Auto" else f"Answer in {answer_language}.")
@@ -226,7 +241,7 @@ def answer_docs(question, passages, api_key, previous_question="", answer_langua
         "the supplied passages as [1], [2], etc. Previous conversation is for "
         "disambiguation, never evidence. For Darija use natural Moroccan vocabulary "
         "and keep technical terms in English when natural. "
-        + language_rule + " " + documentation_prompt(task, level)
+        + language_rule + " " + documentation_prompt(task, level, code_examples)
     )
     completion = Groq(api_key=api_key).chat.completions.create(
         model=GROQ_MODEL, temperature=0,
@@ -259,7 +274,8 @@ API_EXAMPLES = (
 
 def render_header(mode, language):
     if mode == "ask" and current_history():
-        st.markdown(f'<p class="conversation-heading">{escape(t("documentation", language).title())}</p>',
+        st.markdown(f'<p class="conversation-heading">Python 3.13 · '
+                    f'{escape(t("documentation", language).title())}</p>',
                     unsafe_allow_html=True)
         return
     title_key, subtitle_key = MODE_TEXT[mode]
@@ -275,7 +291,7 @@ def render_sources(passages, language):
     for number, (item, _score) in enumerate(passages, 1):
         st.markdown(f"**[{number}] {item['title']}**")
         st.caption(f"{item['module']} · {item['section']} · Python {item['version']}")
-        with st.expander(t("passage", language)):
+        with st.popover(t("passage", language)):
             st.write(item["content"])
         st.link_button(t("open", language), item["source_url"])
 
@@ -292,9 +308,63 @@ def conversation_titles():
     return st.session_state.setdefault("conversation_titles", {})
 
 
+def comparison_names(question, api_positions):
+    """Reconnaît seulement deux API nommées et réellement présentes dans l'index."""
+    match = re.search(r"\b([A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*)\s*(?:\(\))?\s+"
+                      r"(?:vs\.?|versus)\s+([A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*)",
+                      question, re.I)
+    if not match:
+        return ()
+    names = tuple(name.casefold() for name in match.groups())
+    return names if names[0] != names[1] and all(n in api_positions for n in names) else ()
+
+
+def comparison_table(question, passages, api_positions, language):
+    """Petites comparaisons uniquement quand les deux passages les établissent."""
+    names = comparison_names(question, api_positions)
+    if not names or not all(any(p[0].get("api_name", "").casefold() == name
+                                for p in passages) for name in names):
+        return None
+    contents = [next(p[0]["content"].casefold() for p in passages
+                     if p[0].get("api_name", "").casefold() == name) for name in names]
+    if names == ("json.load", "json.loads") and (
+        "deserialize fp to a python object" in contents[0]
+        and "file-like object" in contents[1]
+        and "str , bytes or bytearray" in contents[1]):
+        return {"": [t("comparison_input", language), t("comparison_result", language)],
+                "json.load": [t("file_object", language), t("python_object", language)],
+                "json.loads": [t("json_value", language), t("python_object", language)]}
+    if names == ("list.sort", "sorted") and (
+        "sorts the list in place" in contents[0]
+        and "new sorted list" in contents[1]):
+        return {"": [t("comparison_input", language), t("comparison_effect", language)],
+                "list.sort": [t("list_input", language), t("in_place", language)],
+                "sorted": [t("iterable", language), t("new_list", language)]}
+    return None
+
+
+def api_suggestions(prefix, api_positions, limit=5):
+    prefix = prefix.strip().casefold()
+    if len(prefix) < 3 or prefix in api_positions:
+        return []
+    featured = {name: rank for rank, name in enumerate(
+        ("json.load", "json.loads", "json.dump", "json.dumps"))}
+    return sorted((name for name in api_positions if name.startswith(prefix)),
+                  key=lambda name: (featured.get(name, 100), len(name), name))[:limit]
+
+
+def traceback_details(text):
+    """Ne lit que le dernier cadre et le dernier type d'erreur explicites."""
+    error = re.search(r"(?m)^([A-Za-z_]\w*(?:Error|Exception|Warning)):\s*(.+)$", text)
+    frames = re.findall(r'File "([^"]+)", line (\d+)(?:, in ([^\n]+))?', text)
+    return {"type": error.group(1) if error else "",
+            "message": error.group(2) if error else "",
+            "frame": frames[-1] if frames else None}
+
+
 def title_for(question, task, language):
     """Titres courts déterministes, sans appel au modèle."""
-    if task == "code":
+    if task in ("code", "fix"):
         issue = "SyntaxError" if code_diagnostic(question) else "Python"
         return {
             "en": f"Understanding {issue} code", "fr": f"Comprendre le code {issue}",
@@ -336,52 +406,136 @@ def set_api_example(api):
     st.session_state.api_pending = api
 
 
+def set_feedback(turn_id, value):
+    st.session_state.setdefault("feedback", {})[turn_id] = value
+
+
+def delete_chat(chat_id):
+    conversations().pop(chat_id, None)
+    conversation_titles().pop(chat_id, None)
+    if st.session_state.current_chat == chat_id:
+        new_chat()
+
+
 def action_question(action, turn):
     st.session_state.pending_question = turn["question"]
     st.session_state.pending_task = action
     st.session_state.mode = "ask"
 
 
-def render_conversation(language):
+def related_api_names(turn, records, api_positions):
+    """Suggestions strictement issues des noms enregistrés dans l'index."""
+    names = [item["api_name"] for item, _ in turn["passages"] if item.get("api_name")]
+    if not names:
+        return []
+    head = names[0]
+    module = head.split(".")[0]
+    indexed = [name for name in api_positions if name.startswith(module + ".")
+               and name != head.casefold()]
+    preferred = sorted(indexed, key=lambda name: (abs(len(name) - len(head)), name))
+    return list(dict.fromkeys(preferred + [name for name in names[1:]]))[:3]
+
+
+def related_questions(turn, records, api_positions, language):
+    names = related_api_names(turn, records, api_positions)
+    if not names:
+        return []
+    current = next((item["api_name"] for item, _ in turn["passages"]
+                    if item.get("api_name")), "")
+    suggestions = []
+    if current:
+        suggestions.append(t("compare_prompt", language).format(first=current,
+                                                            second=names[0]))
+    suggestions.extend(t("about_prompt", language).format(api=name) for name in names[:2])
+    return suggestions[:3]
+
+
+def render_conversation(language, records, api_positions):
     for number, turn in enumerate(current_history()):
         with st.container(key=f"conversation_turn_{number}"):
             st.caption(t("you", language))
-            if turn.get("task") == "code":
+            if turn.get("task") in ("code", "fix"):
+                st.caption(t("original", language))
                 st.code(turn["question"], language="python")
             elif turn.get("task") == "error":
-                st.code(turn["question"], language=None)
+                details = traceback_details(turn["question"])
+                if details["type"]:
+                    st.caption(f"{t('error_type', language)} · {details['type']}: {details['message']}")
+                if details["frame"]:
+                    file, line, function = details["frame"]
+                    st.caption(f"{t('file', language)} · {file} · {t('line', language)} {line}"
+                               + (f" · {t('function', language)} · {function}" if function else ""))
+                if "\n" in turn["question"]:
+                    with st.expander(t("traceback", language)):
+                        st.code(turn["question"], language=None)
+                else:
+                    st.code(turn["question"], language=None)
             else:
                 st.markdown(escape(turn["question"]))
             st.caption("DOCQUERY")
             answer = turn["answer"]
             blocks = CODE_BLOCK.findall(answer)
             explanation = CODE_BLOCK.sub("", answer).strip()
-            tabs = st.tabs([t("explanation", language), t("code", language),
-                            t("sources", language)])
+            tabs = st.tabs([t("explanation", language), t("code", language)])
             with tabs[0]:
-                if len(explanation) > 1100 and "\n\n" in explanation:
+                if len(explanation) > 750 and "\n\n" in explanation:
                     first, rest = explanation.split("\n\n", 1)
                     st.markdown(first)
-                    with st.expander(t("show_more", language)):
+                    with st.expander(t("more_details", language)):
                         st.markdown(rest)
                 else:
                     st.markdown(explanation)
+                table = comparison_table(turn["question"], turn["passages"], api_positions,
+                                         language)
+                if table:
+                    st.table(table)
             with tabs[1]:
                 if blocks:
                     for block in blocks:
+                        if turn.get("task") in ("code", "fix") and code_diagnostic(turn["question"]):
+                            st.caption(t("corrected", language))
                         st.code(block.strip(), language="python")
                 else:
                     st.caption("—")
-            with tabs[2]:
+            with st.expander(t("sources_used", language).format(count=len(turn["passages"])),
+                             expanded=st.session_state.show_sources):
                 render_sources(turn["passages"], language)
             if number == len(current_history()) - 1:
                 with st.container(key="answer_actions"):
-                    cols = st.columns([1, 1.2, 1.5, 1.6], gap="small")
+                    cols = st.columns([.85, 1, 1, 1.2, 1.3], gap="small")
                     with cols[0].popover(t("copy", language)):
                         st.code(answer, language=None)
-                    for col, action in zip(cols[1:], ("simplify", "example", "deeper")):
+                    for col, action in zip(cols[1:], ("simplify", "example", "deeper",
+                                                       "regenerate")):
                         col.button(t(action, language), key=f"action_{number}_{action}",
                                    on_click=action_question, args=(action, turn))
+                    if turn.get("task") == "code" and code_diagnostic(turn["question"]):
+                        st.button(t("fix_code", language), key=f"fix_{number}",
+                                  on_click=action_question, args=("fix", turn))
+                    related = related_api_names(turn, records, api_positions)
+                    if related:
+                        with st.popover(t("related_apis", language)):
+                            for api in related:
+                                if st.button(api, key=f"related_api_{number}_{api}"):
+                                    set_api_example(api)
+                                    st.session_state.mode = "api"
+                                    st.rerun()
+                    questions = related_questions(turn, records, api_positions, language)
+                    if questions:
+                        st.caption(t("related_short", language))
+                        with st.container(key="related_questions"):
+                            cols = st.columns(len(questions))
+                            for pos, question in enumerate(questions):
+                                cols[pos].button(question, key=f"related_question_{number}_{pos}",
+                                                 on_click=set_suggestion, args=(question,))
+                    st.caption(t("helpful", language))
+                    feedback_cols = st.columns([.8, .8, 5])
+                    turn_id = turn.get("id", f"{st.session_state.current_chat}_{number}")
+                    for col, value in zip(feedback_cols[:2], ("yes", "no")):
+                        col.button(t(value, language), key=f"feedback_{turn_id}_{value}",
+                                   on_click=set_feedback, args=(turn_id, value))
+                    if st.session_state.get("feedback", {}).get(turn_id):
+                        st.caption(t("thanks", language))
             st.divider()
 
 
@@ -393,7 +547,7 @@ def is_followup(question):
 
 
 def retrieval_query(question, task, previous=""):
-    if task == "code":
+    if task in ("code", "fix"):
         diagnostic = code_diagnostic(question)
         api_names = re.findall(r"\b[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)+\b", question)
         if diagnostic:
@@ -415,8 +569,10 @@ def process_docs(question, task, index, records, api_positions, language):
     history = current_history()
     previous = history[-1]["question"] if history else ""
     query = retrieval_query(question, task, previous)
+    progress = ("analyzing_code" if task in ("code", "fix") else
+                "analyzing_error" if task == "error" else "searching")
     try:
-        with st.spinner(t("searching", language)):
+        with st.spinner(t(progress, language)):
             passages = search(query, get_embedding_model(), index, records, api_positions)
     except Exception:
         st.error(t("search_error", language))
@@ -428,13 +584,18 @@ def process_docs(question, task, index, records, api_positions, language):
         with st.spinner(t("preparing", language)):
             answer = answer_docs(question, passages, api_key, previous,
                                  st.session_state.answer_language, task,
-                                 st.session_state.explanation_level)
+                                 st.session_state.explanation_level,
+                                 st.session_state.code_examples)
     except Exception:
         st.error(t("groq_error", language))
         return
+    if task == "regenerate" and history:
+        history[-1]["answer"] = answer
+        history[-1]["passages"] = passages
+        st.rerun()
     if not history:
         conversation_titles()[st.session_state.current_chat] = title_for(question, task, language)
-    history.append({"question": question, "answer": answer,
+    history.append({"id": uuid.uuid4().hex, "question": question, "answer": answer,
                     "passages": passages, "task": task})
     del history[:-12]
     st.rerun()  # Réduit le hero dès la première réponse, sans relancer la recherche.
@@ -450,17 +611,17 @@ def render_ask_mode(index, records, api_positions, language):
             submitted = st.form_submit_button("→", help=t("send", language),
                                               type="primary", use_container_width=True)
     if not current_history():
-        st.caption(t("try", language))
+        st.caption(t("ask_suggestions", language))
         with st.container(key="suggestion_chips"):
-            cols = st.columns(2)
-            for number, suggestion in enumerate(SUGGESTIONS):
-                cols[number % 2].button(suggestion, key=f"suggest_{number}",
+            cols = st.columns(4)
+            for number, suggestion in enumerate(SUGGESTIONS[language]):
+                cols[number].button(suggestion, key=f"suggest_{number}",
                                         on_click=set_suggestion, args=(suggestion,))
     pending = st.session_state.pop("pending_question", None)
     task = st.session_state.pop("pending_task", "ask")
     if pending or submitted:
         process_docs(pending or question, task, index, records, api_positions, language)
-    render_conversation(language)
+    render_conversation(language, records, api_positions)
 
 
 def api_details(item):
@@ -478,10 +639,18 @@ def api_details(item):
 
 
 def render_api_mode(records, api_positions, language):
-    with st.form("api_search_form"):
-        query = st.text_input(t("api_name", language), key="api_query",
-                              placeholder="asyncio.gather")
-        submitted = st.form_submit_button(t("search_api", language))
+    query = st.text_input(t("api_name", language), key="api_query",
+                          placeholder="asyncio.gather")
+    submitted = st.button(t("search_api", language), key="api_submit")
+    suggestions = api_suggestions(query, api_positions)
+    if suggestions:
+        st.caption(t("api_matches", language))
+        with st.container(key="api_suggestion_chips"):
+            cols = st.columns(min(len(suggestions), 4))
+            for number, api in enumerate(suggestions):
+                label = records[api_positions[api][0]]["api_name"]
+                cols[number % len(cols)].button(label, key=f"api_match_{number}",
+                                                on_click=set_api_example, args=(api,))
     st.caption(t("try_api", language))
     with st.container(key="api_chips"):
         cols = st.columns(3)
@@ -490,8 +659,9 @@ def render_api_mode(records, api_positions, language):
                                     on_click=set_api_example, args=(api,))
     pending = st.session_state.pop("api_pending", None)
     if submitted or pending:
-        st.session_state.api_result = lookup_api(pending or query, records, api_positions)
-        st.session_state.api_searched = True
+        with st.spinner(t("looking_up", language)):
+            st.session_state.api_result = lookup_api(pending or query, records, api_positions)
+            st.session_state.api_searched = True
     if not st.session_state.get("api_searched"):
         return
     match = st.session_state.get("api_result")
@@ -539,12 +709,12 @@ def render_explain_mode(mode, index, records, api_positions, language):
                                             else "analyze_error", language))
     if submitted:
         process_docs(value, mode, index, records, api_positions, language)
-    render_conversation(language)
+    render_conversation(language, records, api_positions)
 
 
 def render_search_mode(index, records, api_positions, language):
     with st.form("direct_search"):
-        query = st.text_input(t("question", language), placeholder="json.loads")
+        query = st.text_input(t("docs_query", language), placeholder=t("docs_query", language))
         submitted = st.form_submit_button(t("search", language))
     if submitted:
         if not query.strip():
@@ -553,7 +723,7 @@ def render_search_mode(index, records, api_positions, language):
             try:
                 with st.spinner(t("searching", language)):
                     st.session_state.docs_search_results = search(
-                        query, get_embedding_model(), index, records, api_positions)
+                        query, get_embedding_model(), index, records, api_positions, top_k=6)
             except Exception:
                 st.error(t("search_error", language))
                 return
@@ -567,7 +737,7 @@ def render_search_mode(index, records, api_positions, language):
         st.subheader(t("search_results", language))
         for number, (item, _score) in enumerate(results, 1):
             st.markdown(f"### {number}. {item.get('api_name') or item['section']}")
-            st.caption(f"{item['title']} · {item['module']}")
+            st.caption(f"{item['title']} · {item['module']} · Python {item['version']}")
             preview = item["content"]
             st.write(preview[:320].rsplit(" ", 1)[0] + ("…" if len(preview) > 320 else ""))
             with st.expander(t("passage", language)):
@@ -617,8 +787,13 @@ def render_pdf_mode(language):
                f"{len(document['chunks'])} {t('pdf_passages', language)} · "
                f"{t('pdf_ready', language)}")
     with st.form("pdf_question"):
-        question = st.text_input(t("pdf_question", language))
-        submitted = st.form_submit_button(t("send", language))
+        question_col, send_col = st.columns([9, 1.3], vertical_alignment="bottom", gap="small")
+        with question_col:
+            question = st.text_input(t("pdf_question", language),
+                                     placeholder=t("pdf_question", language))
+        with send_col:
+            submitted = st.form_submit_button("→", help=t("send", language),
+                                              use_container_width=True)
     if submitted:
         st.session_state.pop("pdf_result", None)
         if not question.strip():
@@ -635,7 +810,8 @@ def render_pdf_mode(language):
                     with st.spinner(t("preparing", language)):
                         answer = answer_question(question.strip(), passages, get_groq_api_key(),
                                                  st.session_state.answer_language,
-                                                 st.session_state.explanation_level)
+                                                 st.session_state.explanation_level,
+                                                 st.session_state.code_examples)
                     st.session_state.pdf_result = {"answer": answer, "passages": passages}
             except Exception:
                 st.error(t("groq_error", language))
@@ -651,6 +827,8 @@ st.set_page_config(page_title="DocQuery", layout="wide", initial_sidebar_state="
 st.session_state.setdefault("ui_language", "en")
 st.session_state.setdefault("answer_language", "Auto")
 st.session_state.setdefault("explanation_level", "Standard")
+st.session_state.setdefault("code_examples", True)
+st.session_state.setdefault("show_sources", False)
 st.session_state.setdefault("theme", "System")
 st.session_state.setdefault("python_version", "3.13")
 st.session_state.setdefault("mode", "ask")
@@ -660,9 +838,29 @@ inject_custom_css(st.session_state.theme)
 with st.sidebar:
     st.markdown("## DocQuery")
     language = st.session_state.ui_language
-    st.button("+ " + t("new", language), on_click=new_chat, key="new_chat")
-    st.caption(t("documentation", language))
+    st.button("+ " + t("new_short", language), on_click=new_chat, key="new_chat")
     st.markdown(f"Python {st.session_state.python_version}")
+    with st.popover(t("commands", language), key="command_palette"):
+        command_query = st.text_input(t("command_search", language),
+                                      key="command_query", placeholder=t("command_search", language))
+        commands = [("ask", "ask"), ("api", "api"), ("code", "code_mode"),
+                    ("error", "error_mode"), ("search_mode", "search_mode")]
+        if not command_query.strip() or t("new_short", language).casefold().find(
+                command_query.casefold()) >= 0:
+            st.button(t("new_short", language), key="command_new", on_click=new_chat)
+        for target, label in commands:
+            if command_query.casefold() in t(label, language).casefold():
+                if st.button(t(label, language), key=f"command_{target}"):
+                    st.session_state.mode = target
+                    st.rerun()
+        for chat_id, turns in reversed(list(conversations().items())[-8:]):
+            title = conversation_titles().get(chat_id, title_for(
+                turns[0]["question"], turns[0].get("task", "ask"), language)) if turns else ""
+            if title and command_query.casefold() in title.casefold():
+                if st.button(title, key=f"command_chat_{chat_id}"):
+                    st.session_state.current_chat = chat_id
+                    st.session_state.mode = "ask"
+                    st.rerun()
     for group, modes in (("ask_group", ("ask",)), ("tools", ("api", "code", "error")),
                          ("knowledge", ("pdf", "search_mode"))):
         st.caption(t(group, language))
@@ -675,12 +873,26 @@ with st.sidebar:
                     st.rerun()
     st.caption(t("conversations", language))
     for chat_id, turns in reversed(list(conversations().items())[-8:]):
-        if turns and st.button(conversation_titles().get(chat_id, title_for(
-                turns[0]["question"], turns[0].get("task", "ask"), language)),
-                key=f"chat_{chat_id}"):
-            st.session_state.current_chat = chat_id
-            st.session_state.mode = "ask"
-            st.rerun()
+        if not turns:
+            continue
+        name = conversation_titles().get(chat_id, title_for(
+            turns[0]["question"], turns[0].get("task", "ask"), language))
+        title_col, menu_col = st.columns([6, 1], gap="small")
+        with title_col:
+            if st.button(name, key=f"chat_{chat_id}"):
+                st.session_state.current_chat = chat_id
+                st.session_state.mode = "ask"
+                st.rerun()
+        with menu_col.popover("···"):
+            edited = st.text_input(t("chat_name", language), value=name,
+                                   key=f"rename_{chat_id}", max_chars=60)
+            if st.button(t("save_name", language), key=f"save_name_{chat_id}"):
+                if edited.strip():
+                    conversation_titles()[chat_id] = edited.strip()
+                    st.rerun()
+            if st.button(t("delete", language), key=f"delete_{chat_id}"):
+                delete_chat(chat_id)
+                st.rerun()
     with st.expander(t("settings", language)):
         st.selectbox(t("interface", language), list(LANGUAGES),
                      format_func=LANGUAGES.get, key="ui_language")
@@ -692,6 +904,8 @@ with st.sidebar:
         st.selectbox(t("level", language), ("Beginner", "Standard", "Advanced"),
                      format_func=lambda x: t("level_" + x.lower(), language),
                      key="explanation_level")
+        st.toggle(t("code_examples", language), key="code_examples")
+        st.toggle(t("show_sources", language), key="show_sources")
 
 language = st.session_state.ui_language
 mode = st.session_state.mode
