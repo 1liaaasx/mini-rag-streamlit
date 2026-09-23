@@ -285,7 +285,7 @@ MODE_TEXT = {
     "ask": ("heading", "ask_intro"),
     "api": ("api", "api_intro"),
     "code": ("code_mode", "code_intro"),
-    "error": ("error_mode", "error_intro"),
+    "error": ("debug_python", "error_intro"),
     "pdf": ("pdf", "pdf_intro"),
     "search_mode": ("search_mode", "search_intro"),
 }
@@ -297,8 +297,7 @@ API_EXAMPLES = (
 
 def render_header(mode, language):
     if mode == "ask" and current_history():
-        st.markdown(f'<p class="conversation-heading">Python 3.13 · '
-                    f'{escape(t("documentation", language).title())}</p>',
+        st.markdown(f'<p class="conversation-heading">{escape(t("conversation_label", language))}</p>',
                     unsafe_allow_html=True)
         return
     title_key, subtitle_key = MODE_TEXT[mode]
@@ -414,12 +413,10 @@ def new_chat():
     st.session_state.chat_counter = st.session_state.get("chat_counter", 0) + 1
     st.session_state.current_chat = st.session_state.chat_counter
     conversations()[st.session_state.current_chat] = []
-    st.session_state.draft_question = ""
     st.session_state.mode = "ask"
 
 
 def set_suggestion(question):
-    st.session_state.draft_question = question
     st.session_state.pending_question = question
     st.session_state.mode = "ask"
 
@@ -499,8 +496,8 @@ def render_conversation(language, records, api_positions):
             answer = turn["answer"]
             blocks = CODE_BLOCK.findall(answer)
             explanation = CODE_BLOCK.sub("", answer).strip()
-            tabs = st.tabs([t("explanation", language), t("code", language)])
-            with tabs[0]:
+            with st.container(key=f"answer_content_{number}"):
+                st.markdown(f"**{t('explanation', language)}**")
                 if len(explanation) > 750 and "\n\n" in explanation:
                     first, rest = explanation.split("\n\n", 1)
                     st.markdown(first)
@@ -512,14 +509,12 @@ def render_conversation(language, records, api_positions):
                                          language)
                 if table:
                     st.table(table)
-            with tabs[1]:
                 if blocks:
+                    st.markdown(f"**{t('code', language)}**")
                     for block in blocks:
                         if turn.get("task") in ("code", "fix") and code_diagnostic(turn["question"]):
                             st.caption(t("corrected", language))
                         st.code(block.strip(), language="python")
-                else:
-                    st.caption("—")
             with st.expander(t("sources_used", language).format(count=len(turn["passages"])),
                              expanded=st.session_state.show_sources):
                 render_sources(turn["passages"], language)
@@ -625,15 +620,14 @@ def process_docs(question, task, index, records, api_positions, language):
 
 
 def render_ask_mode(index, records, api_positions, language):
-    with st.form("documentation_question", border=False):
-        col_input, col_send = st.columns([9, 1.3], vertical_alignment="bottom", gap="small")
-        with col_input:
-            question = st.text_input(t("question", language), key="draft_question",
-                                     label_visibility="collapsed", placeholder=t("question", language))
-        with col_send:
-            submitted = st.form_submit_button("→", help=t("send", language),
-                                              type="primary", use_container_width=True)
     if not current_history():
+        with st.container(key="quick_modes"):
+            cols = st.columns(4, gap="small")
+            for col, target, key in zip(cols, ("ask", "api", "code", "error"),
+                                        ("quick_docs", "quick_api", "quick_code", "quick_debug")):
+                if col.button(t(key, language), key=f"quick_{target}"):
+                    st.session_state.mode = target
+                    st.rerun()
         st.caption(t("ask_suggestions", language))
         with st.container(key="suggestion_chips"):
             cols = st.columns(4)
@@ -642,8 +636,8 @@ def render_ask_mode(index, records, api_positions, language):
                                         on_click=set_suggestion, args=(suggestion,))
     pending = st.session_state.pop("pending_question", None)
     task = st.session_state.pop("pending_task", "ask")
-    if pending or submitted:
-        process_docs(pending or question, task, index, records, api_positions, language)
+    if pending:
+        process_docs(pending, task, index, records, api_positions, language)
     render_conversation(language, records, api_positions)
 
 
@@ -739,7 +733,17 @@ def render_search_mode(index, records, api_positions, language):
     with st.form("direct_search"):
         query = st.text_input(t("docs_query", language), placeholder=t("docs_query", language))
         submitted = st.form_submit_button(t("search", language))
-    if submitted:
+    if st.session_state.get("docs_search_results") is None:
+        st.caption(t("try_api", language))
+        with st.container(key="docs_examples"):
+            cols = st.columns(4, gap="small")
+            for pos, example in enumerate(("json.loads", "asyncio", "pathlib", "exceptions")):
+                if cols[pos].button(example, key=f"docs_example_{pos}"):
+                    st.session_state.docs_search_pending = example
+                    st.rerun()
+    pending = st.session_state.pop("docs_search_pending", None)
+    if submitted or pending:
+        query = pending or query
         if not query.strip():
             st.warning(t("empty", language))
         else:
@@ -752,8 +756,7 @@ def render_search_mode(index, records, api_positions, language):
                 return
     results = st.session_state.get("docs_search_results")
     if results is None:
-        st.caption(t("try_api", language))
-        st.write(" · ".join(API_EXAMPLES[:3]))
+        return
     elif not results:
         st.info(t("no_results", language))
     else:
@@ -809,15 +812,21 @@ def render_pdf_mode(language):
     st.caption(f"{document['pages']} {t('pdf_pages', language)} · "
                f"{len(document['chunks'])} {t('pdf_passages', language)} · "
                f"{t('pdf_ready', language)}")
-    with st.form("pdf_question"):
-        question_col, send_col = st.columns([9, 1.3], vertical_alignment="bottom", gap="small")
-        with question_col:
-            question = st.text_input(t("pdf_question", language),
-                                     placeholder=t("pdf_question", language))
-        with send_col:
-            submitted = st.form_submit_button("→", help=t("send", language),
-                                              use_container_width=True)
-    if submitted:
+    st.caption(t("pdf_question", language))
+    if "pdf_result" in st.session_state:
+        st.markdown(st.session_state.pdf_result["answer"])
+        with st.expander(t("sources", language)):
+            for number, (passage, _score) in enumerate(st.session_state.pdf_result["passages"], 1):
+                st.markdown(f"**[{number}]**")
+                st.write(passage)
+
+
+def process_pdf_question(question, language):
+    document = st.session_state.get("document")
+    if not document:
+        st.warning(t("pdf_file", language))
+        return
+    if question is not None:
         st.session_state.pop("pdf_result", None)
         if not question.strip():
             st.warning(t("empty", language))
@@ -836,14 +845,29 @@ def render_pdf_mode(language):
                                                  st.session_state.explanation_level,
                                                  st.session_state.code_examples)
                     st.session_state.pdf_result = {"answer": answer, "passages": passages}
+                    st.rerun()
             except Exception:
                 st.error(t("groq_error", language))
-    if "pdf_result" in st.session_state:
-        st.markdown(st.session_state.pdf_result["answer"])
-        with st.expander(t("sources", language)):
-            for number, (passage, _score) in enumerate(st.session_state.pdf_result["passages"], 1):
-                st.markdown(f"**[{number}]**")
-                st.write(passage)
+
+
+def show_settings(language):
+    st.markdown(f'<h1 class="app-title">{escape(t("settings", language))}</h1>',
+                unsafe_allow_html=True)
+    st.subheader(t("settings_appearance", language))
+    st.selectbox(t("theme", language), ("System", "Light", "Dark"),
+                 format_func=lambda value: t("theme_" + value.lower(), language), key="theme")
+    st.subheader(t("settings_language", language))
+    st.selectbox(t("interface", language), list(LANGUAGES),
+                 format_func=LANGUAGES.get, key="ui_language")
+    language = st.session_state.ui_language
+    st.selectbox(t("answer_language", language),
+                 ("Auto", "English", "Français", "Darija"), key="answer_language")
+    st.subheader(t("settings_response", language))
+    st.selectbox(t("level", language), ("Beginner", "Standard", "Advanced"),
+                 format_func=lambda value: t("level_" + value.lower(), language),
+                 key="explanation_level")
+    st.toggle(t("code_examples", language), key="code_examples")
+    st.toggle(t("show_sources", language), key="show_sources")
 
 
 st.set_page_config(page_title="DocQuery", layout="wide", initial_sidebar_state="auto")
@@ -859,32 +883,13 @@ st.session_state.setdefault("current_chat", 0)
 inject_custom_css(st.session_state.theme)
 
 with st.sidebar:
-    st.markdown("## DocQuery")
+    st.markdown('<div class="sidebar-brand">DocQuery<span class="brand-mark">✦</span></div>',
+                unsafe_allow_html=True)
     language = st.session_state.ui_language
-    st.button("+ " + t("new_short", language), on_click=new_chat, key="new_chat")
-    st.markdown(f"Python {st.session_state.python_version}")
-    with st.popover(t("commands", language), key="command_palette"):
-        command_query = st.text_input(t("command_search", language),
-                                      key="command_query", placeholder=t("command_search", language))
-        commands = [("ask", "ask"), ("api", "api"), ("code", "code_mode"),
-                    ("error", "error_mode"), ("search_mode", "search_mode")]
-        if not command_query.strip() or t("new_short", language).casefold().find(
-                command_query.casefold()) >= 0:
-            st.button(t("new_short", language), key="command_new", on_click=new_chat)
-        for target, label in commands:
-            if command_query.casefold() in t(label, language).casefold():
-                if st.button(t(label, language), key=f"command_{target}"):
-                    st.session_state.mode = target
-                    st.rerun()
-        for chat_id, turns in reversed(list(conversations().items())[-8:]):
-            title = conversation_titles().get(chat_id, title_for(
-                turns[0]["question"], turns[0].get("task", "ask"), language)) if turns else ""
-            if title and command_query.casefold() in title.casefold():
-                if st.button(title, key=f"command_chat_{chat_id}"):
-                    st.session_state.current_chat = chat_id
-                    st.session_state.mode = "ask"
-                    st.rerun()
-    for group, modes in (("ask_group", ("ask",)), ("tools", ("api", "code", "error")),
+    st.button("+ " + t("new_short", language), on_click=new_chat,
+              key="new_chat", use_container_width=True)
+    st.caption(f"Python {st.session_state.python_version}")
+    for group, modes in (("tools", ("ask", "api", "code", "error")),
                          ("knowledge", ("pdf", "search_mode"))):
         st.caption(t(group, language))
         for mode_name in modes:
@@ -894,7 +899,7 @@ with st.sidebar:
                 if st.button(t(label_key, language), key=f"nav_{mode_name}"):
                     st.session_state.mode = mode_name
                     st.rerun()
-    st.caption(t("conversations", language))
+    st.caption(t("recent", language))
     for chat_id, turns in reversed(list(conversations().items())[-8:]):
         if not turns:
             continue
@@ -916,38 +921,69 @@ with st.sidebar:
             if st.button(t("delete", language), key=f"delete_{chat_id}"):
                 delete_chat(chat_id)
                 st.rerun()
-    with st.expander(t("settings", language)):
-        st.selectbox(t("interface", language), list(LANGUAGES),
-                     format_func=LANGUAGES.get, key="ui_language")
-        language = st.session_state.ui_language
-        st.selectbox(t("answer_language", language),
-                     ("Auto", "English", "Français", "Darija"), key="answer_language")
-        st.selectbox(t("theme", language), ("System", "Light", "Dark"),
-                     format_func=lambda x: t("theme_" + x.lower(), language), key="theme")
-        st.selectbox(t("level", language), ("Beginner", "Standard", "Advanced"),
-                     format_func=lambda x: t("level_" + x.lower(), language),
-                     key="explanation_level")
-        st.toggle(t("code_examples", language), key="code_examples")
-        st.toggle(t("show_sources", language), key="show_sources")
+    if st.button(t("settings", language), key="sidebar_settings"):
+        st.session_state.mode = "settings"
+        st.rerun()
 
 language = st.session_state.ui_language
 mode = st.session_state.mode
-render_header(mode, language)
-if mode == "pdf":
-    render_pdf_mode(language)
-else:
-    try:
-        index, records, manifest, api_positions = get_documentation()
-        if manifest["model"] != MODEL_NAME:
-            raise ValueError("Embedding model mismatch")
-    except (OSError, KeyError, ValueError):
-        st.error(t("index_error", language))
-        st.stop()
-    if mode == "api":
-        render_api_mode(records, api_positions, language)
-    elif mode in ("code", "error"):
-        render_explain_mode(mode, index, records, api_positions, language)
-    elif mode == "search_mode":
-        render_search_mode(index, records, api_positions, language)
+with st.container(key="topbar"):
+    brand, chat_nav, api_nav, docs_nav, spacer, settings_nav = st.columns(
+        [2.5, .8, 1.25, .8, 4, 1], vertical_alignment="center", gap="small")
+    brand.markdown('<span class="topbar-brand">DocQuery</span>', unsafe_allow_html=True)
+    if chat_nav.button(t("nav_chat", language), key="top_chat"):
+        st.session_state.mode = "ask"
+        st.rerun()
+    if api_nav.button(t("search_api", language), key="top_api"):
+        st.session_state.mode = "api"
+        st.rerun()
+    if docs_nav.button(t("nav_docs", language), key="top_docs"):
+        st.session_state.mode = "search_mode"
+        st.rerun()
+    if settings_nav.button(t("settings", language), key="top_settings"):
+        st.session_state.mode = "settings"
+        st.rerun()
+
+with st.container(key="main_surface"):
+    if mode == "settings":
+        show_settings(language)
+    elif mode == "pdf":
+        render_header(mode, language)
+        render_pdf_mode(language)
     else:
-        render_ask_mode(index, records, api_positions, language)
+        try:
+            index, records, manifest, api_positions = get_documentation()
+            if manifest["model"] != MODEL_NAME:
+                raise ValueError("Embedding model mismatch")
+        except (OSError, KeyError, ValueError):
+            st.error(t("index_error", language))
+            st.stop()
+        render_header(mode, language)
+        if mode == "api":
+            render_api_mode(records, api_positions, language)
+        elif mode in ("code", "error"):
+            render_explain_mode(mode, index, records, api_positions, language)
+        elif mode == "search_mode":
+            render_search_mode(index, records, api_positions, language)
+        else:
+            render_ask_mode(index, records, api_positions, language)
+
+if mode in ("ask", "pdf"):
+    with st.bottom:
+        with st.container(key="composer_shell"):
+            with st.container(key="composer_shortcuts"):
+                with st.popover("+", help=t("shortcuts", language)):
+                    for target, key in (("pdf", "shortcut_pdf"), ("code", "shortcut_code"),
+                                        ("error", "shortcut_error")):
+                        if st.button(t(key, language), key=f"composer_go_{target}"):
+                            st.session_state.mode = target
+                            st.rerun()
+                st.caption(f"Python {st.session_state.python_version} · "
+                           f"{t('level_' + st.session_state.explanation_level.lower(), language)} · "
+                           f"{st.session_state.answer_language}")
+            sent = st.chat_input(t("composer_" + mode, language), key=f"chat_composer_{mode}")
+    if sent:
+        if mode == "ask":
+            process_docs(sent, "ask", index, records, api_positions, language)
+        else:
+            process_pdf_question(sent, language)
