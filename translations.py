@@ -142,5 +142,68 @@ TEXT = {
 }
 
 
+EXTRA_TEXT = {
+    "en": {
+        "new_short": "New chat", "commands": "Commands", "command_search": "Find a command or conversation...",
+        "rename": "Rename", "delete": "Delete", "save_name": "Save name", "chat_name": "Conversation name",
+        "ask_suggestions": "Try asking", "docs_query": "Search Python documentation...",
+        "api_matches": "Matching APIs", "sources_used": "{count} sources used", "related_apis": "Related APIs",
+        "related_short": "Related", "regenerate": "Regenerate", "fix_code": "Fix code",
+        "original": "Original", "corrected": "Corrected", "more_details": "More details",
+        "helpful": "Helpful?", "yes": "Yes", "no": "No", "thanks": "Thanks for your feedback.",
+        "code_examples": "Code examples", "show_sources": "Show sources by default",
+        "on": "On", "off": "Off", "looking_up": "Looking up API...",
+        "analyzing_code": "Analyzing code...", "analyzing_error": "Analyzing error...",
+        "error_type": "Error type", "file": "File", "line": "Line", "function": "Function",
+        "comparison_input": "Input", "comparison_result": "Result", "comparison_effect": "Effect",
+        "file_object": "File object", "json_value": "Text or bytes", "python_object": "Python object",
+        "in_place": "Changes the list", "new_list": "New list", "list_input": "List", "iterable": "Iterable",
+        "traceback": "Original traceback",
+        "compare_prompt": "Compare {first} and {second}",
+        "about_prompt": "How does {api} work?",
+    },
+    "fr": {
+        "new_short": "Nouveau chat", "commands": "Commandes", "command_search": "Chercher une commande ou conversation...",
+        "rename": "Renommer", "delete": "Supprimer", "save_name": "Enregistrer", "chat_name": "Nom de la conversation",
+        "ask_suggestions": "Essayez une question", "docs_query": "Chercher dans la documentation Python...",
+        "api_matches": "API correspondantes", "sources_used": "{count} sources utilisées", "related_apis": "API liées",
+        "related_short": "À explorer", "regenerate": "Régénérer", "fix_code": "Corriger le code",
+        "original": "Original", "corrected": "Corrigé", "more_details": "Plus de détails",
+        "helpful": "Utile ?", "yes": "Oui", "no": "Non", "thanks": "Merci pour votre retour.",
+        "code_examples": "Exemples de code", "show_sources": "Afficher les sources par défaut",
+        "on": "Activé", "off": "Désactivé", "looking_up": "Recherche de l’API...",
+        "analyzing_code": "Analyse du code...", "analyzing_error": "Analyse de l’erreur...",
+        "error_type": "Type d’erreur", "file": "Fichier", "line": "Ligne", "function": "Fonction",
+        "comparison_input": "Entrée", "comparison_result": "Résultat", "comparison_effect": "Effet",
+        "file_object": "Objet fichier", "json_value": "Texte ou octets", "python_object": "Objet Python",
+        "in_place": "Modifie la liste", "new_list": "Nouvelle liste", "list_input": "Liste", "iterable": "Itérable",
+        "traceback": "Traceback original",
+        "compare_prompt": "Comparer {first} et {second}",
+        "about_prompt": "Comment fonctionne {api} ?",
+    },
+    "darija": {
+        "new_short": "Chat jdid", "commands": "Commands", "command_search": "Qelleb 3la command ola conversation...",
+        "rename": "Beddel smiya", "delete": "Mse7", "save_name": "Sajjel smiya", "chat_name": "Smiya dyal conversation",
+        "ask_suggestions": "Jarrab tsowel", "docs_query": "Qelleb f documentation Python...",
+        "api_matches": "APIs li l9ina", "sources_used": "{count} sources st3mlna", "related_apis": "APIs mratbtin",
+        "related_short": "Zid tfhem", "regenerate": "3awed ljawab", "fix_code": "Selle7 code",
+        "original": "Original", "corrected": "Mse77e7", "more_details": "Tfassil kter",
+        "helpful": "Nfe3k?", "yes": "Ah", "no": "La", "thanks": "Chokran 3la feedback.",
+        "code_examples": "Exemples dyal code", "show_sources": "Biyyen sources men lwel",
+        "on": "On", "off": "Off", "looking_up": "Kanqelleb 3la API...",
+        "analyzing_code": "Kan7allel code...", "analyzing_error": "Kan7allel error...",
+        "error_type": "No3 dyal error", "file": "Fichier", "line": "Sterr", "function": "Function",
+        "comparison_input": "Input", "comparison_result": "Resultat", "comparison_effect": "Ach kaytra",
+        "file_object": "File object", "json_value": "Text ola bytes", "python_object": "Python object",
+        "in_place": "Katbeddel list", "new_list": "List jdida", "list_input": "List", "iterable": "Iterable",
+        "traceback": "Traceback l'asli",
+        "compare_prompt": "Chnou lfer9 bin {first} w {second}?",
+        "about_prompt": "Kifach katkhdem {api}?",
+    },
+}
+for language, entries in EXTRA_TEXT.items():
+    TEXT[language].update(entries)
+
+
 def t(key, language):
     return TEXT[language][key]
