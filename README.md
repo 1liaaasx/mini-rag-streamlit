@@ -2,6 +2,8 @@
 
 **Developer documentation, explained.** Une application RAG pour explorer une **sélection** de 27 pages de la documentation officielle Python 3.13. Posez une question, consultez les extraits utilisés, recherchez une API précise, expliquez du code ou une erreur, ou interrogez votre propre PDF.
 
+L'interface comprend un chat avec saisie fixée en bas de page, une navigation latérale par mode, une recherche directe de documentation sans appel au LLM et un panneau Settings. Le bouton `+` près de la saisie ouvre les raccourcis PDF, code et erreur. Les préférences de thème, langue et niveau d'explication sont conservées pendant la session. Les modes API Search, Explain Code, Explain Error et Docs Search disposent chacun de leur saisie spécialisée.
+
 Le projet n'indexe **pas l'intégralité** de la documentation Python. Les pages retenues couvrent notamment les fonctions et types intégrés, les exceptions, `pathlib`, `json`, `asyncio`, `contextlib`, `os`, `re`, `typing`, `datetime`, ainsi que quelques sections du tutoriel et de la référence du langage. La liste exacte est dans `build_index.py`.
 
 ## Architecture

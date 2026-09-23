@@ -1,4 +1,4 @@
-streamlit>=1.62,<2
+streamlit>=1.63,<2
 groq>=1.7,<2
 pypdf>=6.19,<7
 sentence-transformers>=5.7,<7
