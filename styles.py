@@ -49,23 +49,30 @@ def inject_custom_css(theme):
     [data-testid="stPopover"]>button {{min-height:40px;padding:0 14px;border-radius:10px;
         font-weight:550;box-shadow:none;transition:background .15s ease,
         border-color .15s ease,color .15s ease,transform .15s ease;}}
-    button[kind="primary"] {{background:var(--accent-hover)!important;color:#FFF!important;
+    button[kind="primary"],button[data-testid^="stBaseButton-primary"],
+    [data-testid="stLinkButton"] a[data-testid="stBaseLinkButton-primary"] {{
+        background:var(--accent-hover)!important;color:#FFF!important;
         border:1px solid var(--accent-hover)!important;}}
-    button[kind="primary"]:hover {{background:var(--accent-active)!important;
+    button[kind="primary"]:hover,button[data-testid^="stBaseButton-primary"]:hover,
+    [data-testid="stLinkButton"] a[data-testid="stBaseLinkButton-primary"]:hover {{
+        background:var(--accent-active)!important;
         border-color:var(--accent-active)!important;}}
-    button[kind="secondary"],
+    button[kind="secondary"],button[data-testid^="stBaseButton-secondary"],
+    button[data-testid="stBaseButton-tertiary"],
     [data-testid="stLinkButton"] a[data-testid="stBaseLinkButton-secondary"],
     [data-testid="stPopover"]>button {{
         background:var(--surface-soft)!important;color:var(--text)!important;
         border:1px solid var(--border)!important;}}
-    button[kind="secondary"]:hover,
+    button[kind="secondary"]:hover,button[data-testid^="stBaseButton-secondary"]:hover,
+    button[data-testid="stBaseButton-tertiary"]:hover,
     [data-testid="stLinkButton"] a[data-testid="stBaseLinkButton-secondary"]:hover,
     [data-testid="stPopover"]>button:hover {{background:var(--surface-hover)!important;
         border-color:var(--border-hover)!important;color:var(--text)!important;}}
-    button[kind="primary"] *,
+    button[kind="primary"] *,button[data-testid^="stBaseButton-primary"] *,
     [data-testid="stLinkButton"] a[data-testid="stBaseLinkButton-primary"] * {{
         color:#FFF!important;fill:#FFF!important;}}
-    button[kind="secondary"] *,
+    button[kind="secondary"] *,button[data-testid^="stBaseButton-secondary"] *,
+    button[data-testid="stBaseButton-tertiary"] *,
     [data-testid="stLinkButton"] a[data-testid="stBaseLinkButton-secondary"] *,
     [data-testid="stLinkButton"] a[data-testid="stBaseLinkButton-secondary"]:visited * {{
         color:var(--text)!important;fill:var(--text)!important;}}
@@ -80,7 +87,8 @@ def inject_custom_css(theme):
     /* Champs, selectbox et menus */
     [data-testid="stTextInputRootElement"],[data-testid="stTextInput"] input,
     [data-testid="stTextArea"] textarea,
-    [data-testid="stSelectbox"] [data-baseweb="select"]>div {{background:var(--input-bg)!important;
+    [data-testid="stSelectbox"] [data-baseweb="select"]>div,
+    [data-testid="stSelectbox"] div:has(>input[role="combobox"]) {{background:var(--input-bg)!important;
         color:var(--text)!important;border:1px solid var(--border)!important;
         border-radius:12px!important;caret-color:var(--accent);}}
     [data-testid="stTextInputField"],[data-testid="stTextInput"] input {{min-height:44px;
@@ -88,20 +96,37 @@ def inject_custom_css(theme):
     [data-testid="stTextInputField"]::placeholder,[data-testid="stTextInput"] input::placeholder,
     [data-testid="stTextArea"] textarea::placeholder {{
         color:var(--placeholder)!important;opacity:1!important;}}
+    [data-testid="stSelectbox"] input[role="combobox"] {{
+        min-height:44px;background:transparent!important;color:var(--text)!important;
+        -webkit-text-fill-color:var(--text)!important;caret-color:var(--accent)!important;}}
+    [data-testid="stSelectbox"] input[role="combobox"]::placeholder {{
+        color:var(--placeholder)!important;-webkit-text-fill-color:var(--placeholder)!important;
+        opacity:1!important;}}
     [data-testid="stTextInputRootElement"]:focus-within,[data-testid="stTextInput"] input:focus,
     [data-testid="stTextArea"] textarea:focus,
-    [data-testid="stSelectbox"] [data-baseweb="select"]>div:focus-within {{
+    [data-testid="stSelectbox"] [data-baseweb="select"]>div:focus-within,
+    [data-testid="stSelectbox"] div:has(>input[role="combobox"]):focus-within {{
         border-color:var(--accent)!important;box-shadow:0 0 0 3px rgba(79,124,255,.12)!important;
         outline:none!important;}}
     [data-testid="stSelectbox"] [data-baseweb="select"] *,
     [data-testid="stSelectbox"] [role="combobox"] {{color:var(--text)!important;
         fill:var(--text-secondary)!important;}}
+    [data-testid="stSelectbox"] button[aria-label="Open"],
+    [data-testid="stSelectbox"] button[aria-label="Clear value"] {{
+        min-height:40px!important;padding:0 .65rem!important;background:transparent!important;
+        border:0!important;color:var(--text-secondary)!important;}}
     [data-testid="stSelectbox"] button,[data-testid="stSelectbox"] svg {{
         color:var(--text-secondary)!important;fill:currentColor!important;}}
     [data-baseweb="popover"] [role="listbox"],[data-baseweb="popover"] [role="option"],
-    [data-baseweb="menu"],[data-testid="stPopoverBody"] {{background:var(--surface)!important;
+    [data-baseweb="menu"],[data-testid="stPopoverBody"],
+    [data-testid="stSelectboxVirtualDropdown"] {{background:var(--surface)!important;
         color:var(--text)!important;border-color:var(--border)!important;}}
+    [data-testid="stSelectboxVirtualDropdown"] * {{color:var(--text)!important;}}
     [data-baseweb="popover"] [role="option"]:hover,[data-baseweb="popover"] [aria-selected="true"] {{
+        background:var(--surface-hover)!important;color:var(--text)!important;}}
+    [data-testid="stSelectboxVirtualDropdown"] [role="option"]:hover,
+    [data-testid="stSelectboxVirtualDropdown"] [role="option"][aria-selected="true"],
+    [data-testid="stSelectboxVirtualDropdown"] [data-focused="true"] {{
         background:var(--surface-hover)!important;color:var(--text)!important;}}
 
     /* Sidebar */
@@ -260,9 +285,12 @@ def inject_custom_css(theme):
         border:1px dashed var(--border-hover)!important;border-radius:18px;}}
     [data-testid="stFileUploaderDropzone"] {{min-height:8.5rem;background:var(--surface)!important;
         border-color:var(--border)!important;}}
+    [data-testid="stFileUploaderDropzone"] * {{color:var(--text-secondary)!important;}}
     [data-testid="stFileUploaderDropzoneInstructions"] small {{display:none;}}
     [data-testid="stFileUploaderDropzone"] button {{background:var(--surface-soft)!important;
         color:var(--text)!important;border-color:var(--border)!important;}}
+    [data-testid="stFileUploaderDropzone"] button * {{color:var(--text)!important;
+        fill:var(--text)!important;}}
     [data-testid="stCode"] {{border:1px solid var(--border);max-width:100%;overflow-x:auto;}}
     [data-testid="stCode"] pre,[data-testid="stCode"] code {{background:var(--surface-soft)!important;}}
     [data-testid="stAlert"] {{border-radius:12px;}}
