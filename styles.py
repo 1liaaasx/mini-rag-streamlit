@@ -29,8 +29,8 @@ def inject_custom_css(theme):
     .stApp [data-testid="stText"], .stApp label {{ color:var(--dq-text); }}
     .stApp [data-testid="stCaptionContainer"] {{ color:var(--dq-muted); }}
     header[data-testid="stHeader"] {{ background:transparent; }}
-    div[data-testid="stMainBlockContainer"] {{ max-width:850px;
-        padding:3.3rem 1.8rem 4rem; }}
+    div[data-testid="stMainBlockContainer"] {{ max-width:950px;
+        padding:2.7rem 1.8rem 3.5rem; }}
     section[data-testid="stSidebar"] {{ background:var(--dq-sidebar);
         border-right:1px solid var(--dq-border); }}
     @media (min-width:769px) {{ section[data-testid="stSidebar"] {{
@@ -53,6 +53,15 @@ def inject_custom_css(theme):
     section[data-testid="stSidebar"] [class*="st-key-new_chat"] button {{
         width:100%; background:var(--dq-surface); border:1px solid var(--dq-border);
         border-radius:6px; color:var(--dq-text); min-height:2.2rem; }}
+    section[data-testid="stSidebar"] [class*="st-key-command_palette"] button {{
+        background:transparent; border:0; color:var(--dq-muted);
+        min-height:1.8rem; font-size:.78rem; }}
+    section[data-testid="stSidebar"] [class*="st-key-chat_"] button {{
+        width:100%; text-align:left; border:0; background:transparent;
+        color:var(--dq-muted); font-size:.8rem; padding:.2rem .35rem;
+        overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }}
+    section[data-testid="stSidebar"] [class*="st-key-chat_"] button:hover {{
+        background:var(--dq-soft); color:var(--dq-text); }}
     section[data-testid="stSidebar"] [data-testid="stExpander"] {{
         margin-top:.8rem; border:0; background:transparent; }}
     .app-eyebrow {{color:var(--dq-muted);font-size:.8rem;font-weight:600;}}
@@ -65,8 +74,22 @@ def inject_custom_css(theme):
     [data-testid="stForm"] {{ border:0; padding:0; }}
     [data-testid="stTextInput"] input, [data-testid="stTextArea"] textarea,
     [data-testid="stSelectbox"] [data-baseweb="select"] > div {{
-        background:var(--dq-surface); color:var(--dq-text);
-        border:1px solid var(--dq-border); border-radius:8px; }}
+        background:var(--dq-surface)!important; color:var(--dq-text)!important;
+        border:1px solid var(--dq-border)!important; border-radius:8px; }}
+    [data-testid="stSelectbox"] [data-baseweb="select"] *,
+    [data-testid="stSelectbox"] [role="combobox"] {{
+        background:transparent!important; color:var(--dq-text)!important;
+        fill:var(--dq-muted)!important; }}
+    [data-baseweb="popover"] [role="listbox"],
+    [data-baseweb="popover"] [role="option"],
+    [data-baseweb="menu"] {{background:var(--dq-surface)!important;
+        color:var(--dq-text)!important;}}
+    [data-baseweb="popover"] [role="option"]:hover,
+    [data-baseweb="popover"] [aria-selected="true"] {{
+        background:var(--dq-soft)!important;color:var(--dq-text)!important;}}
+    [data-baseweb="popover"] > div, [data-testid="stPopoverBody"] {{
+        background:var(--dq-surface)!important;color:var(--dq-text)!important;
+        border-color:var(--dq-border)!important;}}
     [data-testid="stTextInput"] input {{min-height:3.2rem;}}
     [data-testid="stTextInput"] input:focus, [data-testid="stTextArea"] textarea:focus {{
         border-color:var(--dq-accent);box-shadow:0 0 0 1px var(--dq-accent);}}
@@ -76,8 +99,20 @@ def inject_custom_css(theme):
         background:var(--dq-surface);color:var(--dq-text);
         border:1px solid var(--dq-border);border-radius:7px;}}
     [class*="st-key-suggestion_chips"] button,
-    [class*="st-key-api_chips"] button {{min-height:2rem;padding:.25rem .75rem;
+    [class*="st-key-api_chips"] button,
+    [class*="st-key-related_questions"] button,
+    [class*="st-key-api_suggestion_chips"] button {{min-height:2rem;padding:.25rem .75rem;
         border-radius:20px;font-size:.82rem;}}
+    [class*="st-key-suggestion_chips"] [data-testid="stHorizontalBlock"],
+    [class*="st-key-api_chips"] [data-testid="stHorizontalBlock"],
+    [class*="st-key-related_questions"] [data-testid="stHorizontalBlock"],
+    [class*="st-key-api_suggestion_chips"] [data-testid="stHorizontalBlock"] {{
+        flex-wrap:wrap;row-gap:.4rem;justify-content:flex-start;}}
+    [class*="st-key-suggestion_chips"] [data-testid="column"],
+    [class*="st-key-api_chips"] [data-testid="column"],
+    [class*="st-key-related_questions"] [data-testid="column"],
+    [class*="st-key-api_suggestion_chips"] [data-testid="column"] {{
+        flex:0 1 auto!important;min-width:fit-content!important;}}
     [class*="st-key-conversation_turn_"] {{max-width:720px;padding-top:1.3rem;}}
     [class*="st-key-conversation_turn_"] [data-testid="stMarkdownContainer"] p,
     [class*="st-key-conversation_turn_"] [data-testid="stMarkdownContainer"] li {{
@@ -98,8 +133,16 @@ def inject_custom_css(theme):
     div[data-testid="stTabs"] button[aria-selected="true"] {{color:var(--dq-text);}}
     [data-testid="stCode"] {{border:1px solid var(--dq-border);max-width:100%;
         overflow-x:auto;}}
-    [data-testid="stExpander"], [data-testid="stPopoverBody"] {{
-        background:var(--dq-surface);border-color:var(--dq-border);}}
+    [data-testid="stCode"] pre, [data-testid="stCode"] code {{
+        background:var(--dq-soft)!important;color:var(--dq-text)!important;}}
+    [data-testid="stCode"] code span {{color:var(--dq-text)!important;}}
+    [data-testid="stExpander"], [data-testid="stPopoverBody"],
+    [data-testid="stTable"] {{
+        background:var(--dq-surface)!important;border-color:var(--dq-border)!important;
+        color:var(--dq-text)!important;}}
+    [data-testid="stTable"] th, [data-testid="stTable"] td {{
+        background:var(--dq-surface)!important;color:var(--dq-text)!important;
+        border-color:var(--dq-border)!important;}}
     [data-testid="stAlert"] {{border-radius:8px;}}
     @media (max-width:640px) {{
         div[data-testid="stMainBlockContainer"] {{padding:2.1rem 1rem 3rem;}}
