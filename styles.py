@@ -45,7 +45,7 @@ def inject_custom_css(theme):
     div[data-testid="stMainBlockContainer"] {{max-width:1170px;padding:1rem 2rem 9.25rem;}}
 
     /* Boutons */
-    .stButton>button,.stFormSubmitButton>button,.stLinkButton>a,
+    .stButton>button,.stFormSubmitButton>button,[data-testid="stLinkButton"]>a,
     [data-testid="stPopover"]>button {{min-height:40px;padding:0 14px;border-radius:10px;
         font-weight:550;box-shadow:none;transition:background .15s ease,
         border-color .15s ease,color .15s ease,transform .15s ease;}}
@@ -53,15 +53,27 @@ def inject_custom_css(theme):
         border:1px solid var(--accent-hover)!important;}}
     button[kind="primary"]:hover {{background:var(--accent-active)!important;
         border-color:var(--accent-active)!important;}}
-    button[kind="secondary"],.stLinkButton>a,[data-testid="stPopover"]>button {{
+    button[kind="secondary"],
+    [data-testid="stLinkButton"] a[data-testid="stBaseLinkButton-secondary"],
+    [data-testid="stPopover"]>button {{
         background:var(--surface-soft)!important;color:var(--text)!important;
         border:1px solid var(--border)!important;}}
-    button[kind="secondary"]:hover,.stLinkButton>a:hover,
+    button[kind="secondary"]:hover,
+    [data-testid="stLinkButton"] a[data-testid="stBaseLinkButton-secondary"]:hover,
     [data-testid="stPopover"]>button:hover {{background:var(--surface-hover)!important;
         border-color:var(--border-hover)!important;color:var(--text)!important;}}
-    button:disabled,.stLinkButton>a[aria-disabled="true"] {{background:var(--disabled-bg)!important;
+    button[kind="primary"] *,
+    [data-testid="stLinkButton"] a[data-testid="stBaseLinkButton-primary"] * {{
+        color:#FFF!important;fill:#FFF!important;}}
+    button[kind="secondary"] *,
+    [data-testid="stLinkButton"] a[data-testid="stBaseLinkButton-secondary"] *,
+    [data-testid="stLinkButton"] a[data-testid="stBaseLinkButton-secondary"]:visited * {{
+        color:var(--text)!important;fill:var(--text)!important;}}
+    button:disabled,[data-testid="stLinkButton"] a[aria-disabled="true"] {{background:var(--disabled-bg)!important;
         color:var(--disabled-text)!important;border-color:var(--border)!important;
         opacity:.72!important;cursor:not-allowed!important;}}
+    button:disabled *,[data-testid="stLinkButton"] a[aria-disabled="true"] * {{
+        color:var(--disabled-text)!important;fill:var(--disabled-text)!important;}}
     [class*="st-key-delete_"] button {{color:var(--error)!important;
         background:transparent!important;border-color:transparent!important;}}
 
@@ -80,6 +92,8 @@ def inject_custom_css(theme):
     [data-testid="stSelectbox"] [data-baseweb="select"] *,
     [data-testid="stSelectbox"] [role="combobox"] {{color:var(--text)!important;
         fill:var(--text-secondary)!important;}}
+    [data-testid="stSelectbox"] button,[data-testid="stSelectbox"] svg {{
+        color:var(--text-secondary)!important;fill:currentColor!important;}}
     [data-baseweb="popover"] [role="listbox"],[data-baseweb="popover"] [role="option"],
     [data-baseweb="menu"],[data-testid="stPopoverBody"] {{background:var(--surface)!important;
         color:var(--text)!important;border-color:var(--border)!important;}}
@@ -118,6 +132,12 @@ def inject_custom_css(theme):
     section[data-testid="stSidebar"] [data-testid="stPopover"]>button {{min-height:30px;
         padding:0 .45rem;background:transparent!important;border-color:transparent!important;
         color:var(--text-secondary)!important;}}
+    [data-testid="stSidebarCollapseButton"] button {{width:36px!important;height:36px!important;
+        min-height:36px!important;padding:0!important;background:transparent!important;
+        color:var(--text-secondary)!important;border:1px solid transparent!important;}}
+    [data-testid="stSidebarCollapseButton"] button:hover {{background:var(--surface-hover)!important;
+        color:var(--text)!important;}}
+    [data-testid="stSidebarCollapseButton"] svg {{fill:currentColor!important;}}
 
     /* Topbar et surface principale */
     .topbar-brand {{font-size:1.05rem;font-weight:720;color:var(--text);letter-spacing:-.04em;}}
@@ -182,8 +202,12 @@ def inject_custom_css(theme):
         border-bottom:1px solid var(--border);}}
     [class*="st-key-source_card_"] .stButton>button,
     [class*="st-key-source_card_"] .stLinkButton>a {{min-height:32px;padding:0 10px;font-size:.78rem;}}
-    [data-testid="stExpander"],[data-testid="stPopoverBody"],[data-testid="stTable"] {{
+    [data-testid="stExpander"],[data-testid="stExpander"] details,
+    [data-testid="stPopoverBody"],[data-testid="stTable"] {{
         background:var(--surface)!important;border-color:var(--border)!important;color:var(--text)!important;}}
+    [data-testid="stExpander"] summary {{background:var(--surface-soft)!important;
+        color:var(--text)!important;border-radius:10px;}}
+    [data-testid="stExpander"] summary * {{color:var(--text)!important;fill:var(--text)!important;}}
     [data-testid="stExpander"] summary:hover {{background:var(--surface-hover)!important;}}
     [data-testid="stTable"] th,[data-testid="stTable"] td {{background:var(--surface)!important;
         color:var(--text)!important;border-color:var(--border)!important;}}
@@ -191,10 +215,13 @@ def inject_custom_css(theme):
     /* Composer */
     [data-testid="stBottomBlockContainer"] {{padding:.65rem 1rem 1rem!important;
         background:linear-gradient(180deg,transparent,var(--app-bg) 30%)!important;}}
-    [class*="st-key-composer_shell"] {{width:100%;max-width:900px;min-height:94px;
-        max-height:130px;margin:0 auto;padding:.55rem .75rem .6rem;background:var(--surface);
+    [data-testid="stBottomBlockContainer"]>[data-testid="stVerticalBlock"],
+    [data-testid="stBottomBlockContainer"]>div {{width:100%!important;max-width:900px!important;
+        margin-left:auto!important;margin-right:auto!important;}}
+    [class*="st-key-composer_shell"] {{width:100%!important;max-width:900px!important;min-height:94px;
+        max-height:130px;margin:0 auto!important;padding:.55rem .75rem .6rem;background:var(--surface);
         border:1px solid var(--border);border-radius:20px;box-shadow:var(--shadow);
-        transition:border-color .15s ease,box-shadow .15s ease;}}
+        box-sizing:border-box;transition:border-color .15s ease,box-shadow .15s ease;}}
     [class*="st-key-composer_shell"]:focus-within {{border-color:var(--accent);
         box-shadow:0 0 0 3px rgba(79,124,255,.12);}}
     [class*="st-key-composer_shell"] [data-testid="stForm"] {{border:0;padding:0;}}

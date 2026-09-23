@@ -968,32 +968,33 @@ with st.container(key="topbar"):
         st.rerun()
 
 with st.container(key="main_surface"):
-    if mode == "settings":
-        show_settings(language)
-    elif mode == "pdf":
-        render_header(mode, language)
-        render_pdf_mode(language)
-    else:
-        try:
-            index, records, manifest, api_positions = get_documentation()
-            if manifest["model"] != MODEL_NAME:
-                raise ValueError("Embedding model mismatch")
-        except (OSError, KeyError, ValueError):
-            st.error(t("index_error", language))
-            st.stop()
-        render_header(mode, language)
-        if mode == "api":
-            render_api_mode(records, api_positions, language)
-        elif mode in ("code", "error"):
-            render_explain_mode(mode, index, records, api_positions, language)
-        elif mode == "search_mode":
-            render_search_mode(index, records, api_positions, language)
+    with st.container(key="content_column", width=900):
+        if mode == "settings":
+            show_settings(language)
+        elif mode == "pdf":
+            render_header(mode, language)
+            render_pdf_mode(language)
         else:
-            render_ask_mode(index, records, api_positions, language)
+            try:
+                index, records, manifest, api_positions = get_documentation()
+                if manifest["model"] != MODEL_NAME:
+                    raise ValueError("Embedding model mismatch")
+            except (OSError, KeyError, ValueError):
+                st.error(t("index_error", language))
+                st.stop()
+            render_header(mode, language)
+            if mode == "api":
+                render_api_mode(records, api_positions, language)
+            elif mode in ("code", "error"):
+                render_explain_mode(mode, index, records, api_positions, language)
+            elif mode == "search_mode":
+                render_search_mode(index, records, api_positions, language)
+            else:
+                render_ask_mode(index, records, api_positions, language)
 
 if mode in ("ask", "pdf"):
     with st.bottom:
-        with st.container(key="composer_shell"):
+        with st.container(key="composer_shell", width=900):
             state_key = "composer_text" if mode == "ask" else "pdf_composer_text"
             with st.form(f"composer_form_{mode}", border=False):
                 input_col, send_col = st.columns([12, 1], vertical_alignment="center", gap="small")
