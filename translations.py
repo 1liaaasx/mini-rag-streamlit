@@ -144,6 +144,10 @@ TEXT = {
 
 EXTRA_TEXT = {
     "en": {
+        "login_title": "Welcome back", "login_intro": "Sign in to access DocQuery.",
+        "username": "Username", "password": "Password", "sign_in": "Sign in",
+        "invalid_login": "Incorrect username or password.", "logout": "Sign out",
+        "login_configuration_missing": "Login is not configured. Add LOGIN_USERNAME and LOGIN_PASSWORD to Streamlit Secrets.",
         "nav_chat": "Chat", "nav_docs": "Docs", "recent": "RECENT",
         "quick_docs": "Ask Docs", "quick_api": "Search API",
         "quick_code": "Explain Code", "quick_debug": "Debug an error",
@@ -176,6 +180,10 @@ EXTRA_TEXT = {
         "about_prompt": "How does {api} work?",
     },
     "fr": {
+        "login_title": "Bon retour", "login_intro": "Connectez-vous pour accéder à DocQuery.",
+        "username": "Identifiant", "password": "Mot de passe", "sign_in": "Se connecter",
+        "invalid_login": "Identifiant ou mot de passe incorrect.", "logout": "Se déconnecter",
+        "login_configuration_missing": "Le Login n’est pas configuré. Ajoutez LOGIN_USERNAME et LOGIN_PASSWORD aux Secrets Streamlit.",
         "nav_chat": "Chat", "nav_docs": "Documentation", "recent": "RÉCENT",
         "quick_docs": "Question docs", "quick_api": "Chercher une API",
         "quick_code": "Expliquer le code", "quick_debug": "Déboguer une erreur",
@@ -208,6 +216,10 @@ EXTRA_TEXT = {
         "about_prompt": "Comment fonctionne {api} ?",
     },
     "darija": {
+        "login_title": "Mer7ba bik", "login_intro": "Dkhol bach tsta3mel DocQuery.",
+        "username": "Smiya dyal compte", "password": "Mot de passe", "sign_in": "Dkhol",
+        "invalid_login": "Smiya ola mot de passe ma s7i7ch.", "logout": "Khrj",
+        "login_configuration_missing": "Login mazal ma tconfigurach. Zid LOGIN_USERNAME w LOGIN_PASSWORD f Streamlit Secrets.",
         "nav_chat": "Chat", "nav_docs": "Docs", "recent": "L'AKHIRIN",
         "quick_docs": "Sowel Docs", "quick_api": "Qelleb 3la API",
         "quick_code": "Chra7 code", "quick_debug": "Selle7 error",

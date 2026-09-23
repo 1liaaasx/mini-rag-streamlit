@@ -50,19 +50,31 @@ streamlit run app.py
 
 Les fichiers `index/python-3.13.faiss`, `index/metadata.json.gz` et `index/manifest.json` sont déjà inclus dans le dépôt. Le premier lancement télécharge le modèle d'embeddings sur la machine locale ; cela demande Internet et peut prendre un moment. Les dépendances du modèle, dont PyTorch, consomment de la mémoire.
 
-## Clé Groq
+## Configuration des secrets
 
 Créez une clé sur [GroqCloud](https://console.groq.com/keys). L'application lit `st.secrets["GROQ_API_KEY"]`, puis la variable d'environnement locale :
 
 ```bash
-export GROQ_API_KEY="votre-cle"       # Linux/macOS
+export GROQ_API_KEY="votre-cle"           # Linux/macOS
+export LOGIN_USERNAME="votre-identifiant"
+export LOGIN_PASSWORD="votre-mot-de-passe"
 ```
 
 ```powershell
-$env:GROQ_API_KEY = "votre-cle"     # Windows PowerShell
+$env:GROQ_API_KEY = "votre-cle"           # Windows PowerShell
+$env:LOGIN_USERNAME = "votre-identifiant"
+$env:LOGIN_PASSWORD = "votre-mot-de-passe"
 ```
 
-Vous pouvez aussi placer `GROQ_API_KEY = "votre-cle"` dans `.streamlit/secrets.toml`, exclu de Git. **Ne publiez jamais la clé.** Aucune clé OpenAI n'est nécessaire.
+Vous pouvez aussi utiliser `.streamlit/secrets.toml`, exclu de Git :
+
+```toml
+GROQ_API_KEY = "votre-cle"
+LOGIN_USERNAME = "votre-identifiant"
+LOGIN_PASSWORD = "votre-mot-de-passe"
+```
+
+Le compte unique protège toute l'application. L'identifiant et le mot de passe ne sont jamais écrits dans le code ni publiés sur GitHub. **Ne publiez jamais ces secrets.** Aucune clé OpenAI n'est nécessaire.
 
 ## Reconstruire l'index
 
@@ -88,12 +100,15 @@ Le script remplace les trois fichiers dans `index/` ensemble. Commitez-les et d�
 
    ```toml
    GROQ_API_KEY = "votre-cle"
+   LOGIN_USERNAME = "votre-identifiant"
+   LOGIN_PASSWORD = "votre-mot-de-passe"
    ```
 
 4. Déployez. `requirements.txt` installe les dépendances et l'application charge l'index versionné dans le dépôt.
 
 ## Fonctionnalités et limites
 
+- **Connexion** : un compte unique protège toute l’application. Les identifiants viennent uniquement des Secrets Streamlit ou des variables d’environnement ; le bouton de déconnexion ferme la session sans effacer les préférences visuelles.
 - **Ask Documentation** : chat, nouvelles conversations, questions de suivi, actions « Simplify », « Give example », « Explain deeper », « Regenerate », sources repliables et retour utile/pas utile. Les conversations peuvent être renommées ou supprimées et restent uniquement en mémoire de session. Les suggestions initiales et liées préremplissent le composer sans appeler FAISS ni Groq.
 - **Langues et réglages** : interface en anglais, français ou Darija en alphabet latin (`translations.py`). La langue de la réponse se choisit séparément ; `Auto` suit la langue de la dernière question. Le thème suit le système par défaut et peut être forcé en clair ou sombre. Le niveau d’explication (débutant, standard, avancé) change le style des réponses, pas les sources. Les exemples de code optionnels et l’ouverture automatique des sources se règlent séparément. Les choix restent disponibles pendant la session.
 - **API Search** : recherche exacte dans les API indexées, sans appel Groq. La fiche affiche la signature et les détails effectivement présents dans les métadonnées ; les champs absents ne sont pas complétés artificiellement. La saisie propose des API indexées après quelques caractères.
