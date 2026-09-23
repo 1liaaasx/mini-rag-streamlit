@@ -309,13 +309,16 @@ def render_header(mode, language):
     )
 
 
-def render_sources(passages, language):
+def render_sources(passages, language, prefix="source"):
     for number, (item, _score) in enumerate(passages, 1):
-        st.markdown(f"**[{number}] {item['title']}**")
-        st.caption(f"{item['module']} · {item['section']} · Python {item['version']}")
-        with st.popover(t("passage", language)):
-            st.write(item["content"])
-        st.link_button(t("open", language), item["source_url"])
+        with st.container(key=f"source_card_{prefix}_{number}"):
+            st.markdown(f"**[{number}] {escape(item['title'])}**")
+            st.caption(f"Python {item['version']} · {item['module']} · {item['section']}")
+            passage_col, link_col, _ = st.columns([1.25, 1.4, 4], gap="small")
+            with passage_col.popover(t("passage", language)):
+                st.write(item["content"])
+            link_col.link_button(t("open", language), item["source_url"],
+                                 use_container_width=True)
 
 
 def conversations():
@@ -413,17 +416,30 @@ def new_chat():
     st.session_state.chat_counter = st.session_state.get("chat_counter", 0) + 1
     st.session_state.current_chat = st.session_state.chat_counter
     conversations()[st.session_state.current_chat] = []
+    st.session_state.composer_text = ""
     st.session_state.mode = "ask"
 
 
 def set_suggestion(question):
-    st.session_state.pending_question = question
+    """Pré-remplit le composer sans déclencher retrieval ni génération."""
+    st.session_state.composer_text = question
     st.session_state.mode = "ask"
 
 
 def set_api_example(api):
     st.session_state.api_query = api
-    st.session_state.api_pending = api
+
+
+def set_docs_example(query):
+    st.session_state.docs_query = query
+
+
+def queue_composer_submission(state_key, target):
+    """Capture la saisie avant le rerun du formulaire, puis vide le champ."""
+    question = st.session_state.get(state_key, "").strip()
+    if question:
+        st.session_state.queued_composer = (target, question)
+        st.session_state[state_key] = ""
 
 
 def set_feedback(turn_id, value):
@@ -517,7 +533,7 @@ def render_conversation(language, records, api_positions):
                         st.code(block.strip(), language="python")
             with st.expander(t("sources_used", language).format(count=len(turn["passages"])),
                              expanded=st.session_state.show_sources):
-                render_sources(turn["passages"], language)
+                render_sources(turn["passages"], language, prefix=f"turn_{number}")
             if number == len(current_history()) - 1:
                 with st.container(key="answer_actions"):
                     cols = st.columns([.85, 1, 1, 1.2, 1.3], gap="small")
@@ -635,9 +651,9 @@ def render_ask_mode(index, records, api_positions, language):
                 cols[number].button(suggestion, key=f"suggest_{number}",
                                         on_click=set_suggestion, args=(suggestion,))
     pending = st.session_state.pop("pending_question", None)
-    task = st.session_state.pop("pending_task", "ask")
     if pending:
-        process_docs(pending, task, index, records, api_positions, language)
+        process_docs(pending, st.session_state.pop("pending_task", "ask"),
+                     index, records, api_positions, language)
     render_conversation(language, records, api_positions)
 
 
@@ -658,7 +674,7 @@ def api_details(item):
 def render_api_mode(records, api_positions, language):
     query = st.text_input(t("api_name", language), key="api_query",
                           placeholder="asyncio.gather")
-    submitted = st.button(t("search_api", language), key="api_submit")
+    submitted = st.button(t("search_api", language), key="api_submit", type="primary")
     suggestions = api_suggestions(query, api_positions)
     if suggestions:
         st.caption(t("api_matches", language))
@@ -674,10 +690,9 @@ def render_api_mode(records, api_positions, language):
         for number, api in enumerate(API_EXAMPLES):
             cols[number % 3].button(api, key=f"api_example_{number}",
                                     on_click=set_api_example, args=(api,))
-    pending = st.session_state.pop("api_pending", None)
-    if submitted or pending:
+    if submitted:
         with st.spinner(t("looking_up", language)):
-            st.session_state.api_result = lookup_api(pending or query, records, api_positions)
+            st.session_state.api_result = lookup_api(query, records, api_positions)
             st.session_state.api_searched = True
     if not st.session_state.get("api_searched"):
         return
@@ -688,7 +703,7 @@ def render_api_mode(records, api_positions, language):
     item, related = match
     signature, description, returns, example = api_details(item)
     st.subheader(item["api_name"])
-    st.caption(f"{t('module', language)} · {item['module']}")
+    st.caption(f"{t('module', language)} · {item['module']} · Python {item['version']}")
     if signature:
         st.markdown(f"**{t('signature', language)}**")
         st.code(signature, language="python")
@@ -711,7 +726,7 @@ def render_api_mode(records, api_positions, language):
     if related:
         st.markdown(f"**{t('related_apis', language)}**")
         st.write(" · ".join(related))
-    st.link_button(t("official_docs", language), item["source_url"])
+    st.link_button(t("official_docs", language), item["source_url"], type="secondary")
 
 
 def render_explain_mode(mode, index, records, api_positions, language):
@@ -723,7 +738,7 @@ def render_explain_mode(mode, index, records, api_positions, language):
                              placeholder=('def greet(name):\n    return f"Hello {name}"'
                                           if mode == "code" else "SyntaxError: unterminated string literal"))
         submitted = st.form_submit_button(t("explain_code" if mode == "code"
-                                            else "analyze_error", language))
+                                            else "analyze_error", language), type="primary")
     if submitted:
         process_docs(value, mode, index, records, api_positions, language)
     render_conversation(language, records, api_positions)
@@ -731,19 +746,17 @@ def render_explain_mode(mode, index, records, api_positions, language):
 
 def render_search_mode(index, records, api_positions, language):
     with st.form("direct_search"):
-        query = st.text_input(t("docs_query", language), placeholder=t("docs_query", language))
-        submitted = st.form_submit_button(t("search", language))
+        query = st.text_input(t("docs_query", language), key="docs_query",
+                              placeholder=t("docs_query", language))
+        submitted = st.form_submit_button(t("search", language), type="primary")
     if st.session_state.get("docs_search_results") is None:
         st.caption(t("try_api", language))
         with st.container(key="docs_examples"):
             cols = st.columns(4, gap="small")
             for pos, example in enumerate(("json.loads", "asyncio", "pathlib", "exceptions")):
-                if cols[pos].button(example, key=f"docs_example_{pos}"):
-                    st.session_state.docs_search_pending = example
-                    st.rerun()
-    pending = st.session_state.pop("docs_search_pending", None)
-    if submitted or pending:
-        query = pending or query
+                cols[pos].button(example, key=f"docs_example_{pos}",
+                                 on_click=set_docs_example, args=(example,))
+    if submitted:
         if not query.strip():
             st.warning(t("empty", language))
         else:
@@ -768,7 +781,7 @@ def render_search_mode(index, records, api_positions, language):
             st.write(preview[:320].rsplit(" ", 1)[0] + ("…" if len(preview) > 320 else ""))
             with st.expander(t("passage", language)):
                 st.write(preview)
-            st.link_button(t("open", language), item["source_url"])
+            st.link_button(t("open", language), item["source_url"], type="secondary")
             st.divider()
 
 
@@ -851,23 +864,28 @@ def process_pdf_question(question, language):
 
 
 def show_settings(language):
-    st.markdown(f'<h1 class="app-title">{escape(t("settings", language))}</h1>',
-                unsafe_allow_html=True)
-    st.subheader(t("settings_appearance", language))
-    st.selectbox(t("theme", language), ("System", "Light", "Dark"),
-                 format_func=lambda value: t("theme_" + value.lower(), language), key="theme")
-    st.subheader(t("settings_language", language))
-    st.selectbox(t("interface", language), list(LANGUAGES),
-                 format_func=LANGUAGES.get, key="ui_language")
-    language = st.session_state.ui_language
-    st.selectbox(t("answer_language", language),
-                 ("Auto", "English", "Français", "Darija"), key="answer_language")
-    st.subheader(t("settings_response", language))
-    st.selectbox(t("level", language), ("Beginner", "Standard", "Advanced"),
-                 format_func=lambda value: t("level_" + value.lower(), language),
-                 key="explanation_level")
-    st.toggle(t("code_examples", language), key="code_examples")
-    st.toggle(t("show_sources", language), key="show_sources")
+    with st.container(key="settings_panel"):
+        st.markdown(f'<h1 class="app-title">{escape(t("settings", language))}</h1>',
+                    unsafe_allow_html=True)
+        st.subheader(t("settings_appearance", language))
+        st.selectbox(t("theme", language), ("System", "Light", "Dark"),
+                     format_func=lambda value: t("theme_" + value.lower(), language), key="theme")
+        st.subheader(t("settings_language", language))
+        st.selectbox(t("interface", language), list(LANGUAGES),
+                     format_func=LANGUAGES.get, key="ui_language")
+        language = st.session_state.ui_language
+        st.selectbox(t("answer_language", language),
+                     ("Auto", "English", "Français", "Darija"), key="answer_language")
+        st.subheader(t("settings_response", language))
+        st.selectbox(t("level", language), ("Beginner", "Standard", "Advanced"),
+                     format_func=lambda value: t("level_" + value.lower(), language),
+                     key="explanation_level")
+        with st.container(key="setting_row_code"):
+            st.toggle(t("code_examples", language), key="code_examples")
+            st.caption(t("code_examples_help", language))
+        with st.container(key="setting_row_sources"):
+            st.toggle(t("show_sources", language), key="show_sources")
+            st.caption(t("show_sources_help", language))
 
 
 st.set_page_config(page_title="DocQuery", layout="wide", initial_sidebar_state="auto")
@@ -880,6 +898,8 @@ st.session_state.setdefault("theme", "System")
 st.session_state.setdefault("python_version", "3.13")
 st.session_state.setdefault("mode", "ask")
 st.session_state.setdefault("current_chat", 0)
+st.session_state.setdefault("composer_text", "")
+st.session_state.setdefault("pdf_composer_text", "")
 inject_custom_css(st.session_state.theme)
 
 with st.sidebar:
@@ -888,8 +908,11 @@ with st.sidebar:
     language = st.session_state.ui_language
     st.button("+ " + t("new_short", language), on_click=new_chat,
               key="new_chat", use_container_width=True)
-    st.caption(f"Python {st.session_state.python_version}")
-    for group, modes in (("tools", ("ask", "api", "code", "error")),
+    st.caption(t("documentation", language).upper())
+    st.markdown(f'<div class="sidebar-version">Python {st.session_state.python_version}</div>',
+                unsafe_allow_html=True)
+    for group, modes in (("ask_group", ("ask",)),
+                         ("tools", ("api", "code", "error")),
                          ("knowledge", ("pdf", "search_mode"))):
         st.caption(t(group, language))
         for mode_name in modes:
@@ -971,6 +994,18 @@ with st.container(key="main_surface"):
 if mode in ("ask", "pdf"):
     with st.bottom:
         with st.container(key="composer_shell"):
+            state_key = "composer_text" if mode == "ask" else "pdf_composer_text"
+            with st.form(f"composer_form_{mode}", border=False):
+                input_col, send_col = st.columns([12, 1], vertical_alignment="center", gap="small")
+                input_col.text_input(
+                    t("composer_" + mode, language), key=state_key,
+                    placeholder=t("composer_" + mode, language), label_visibility="collapsed",
+                )
+                send_col.form_submit_button(
+                    "↑", help=t("send", language), type="primary",
+                    use_container_width=True, on_click=queue_composer_submission,
+                    args=(state_key, mode),
+                )
             with st.container(key="composer_shortcuts"):
                 with st.popover("+", help=t("shortcuts", language)):
                     for target, key in (("pdf", "shortcut_pdf"), ("code", "shortcut_code"),
@@ -978,12 +1013,16 @@ if mode in ("ask", "pdf"):
                         if st.button(t(key, language), key=f"composer_go_{target}"):
                             st.session_state.mode = target
                             st.rerun()
-                st.caption(f"Python {st.session_state.python_version} · "
-                           f"{t('level_' + st.session_state.explanation_level.lower(), language)} · "
-                           f"{st.session_state.answer_language}")
-            sent = st.chat_input(t("composer_" + mode, language), key=f"chat_composer_{mode}")
-    if sent:
-        if mode == "ask":
-            process_docs(sent, "ask", index, records, api_positions, language)
+                st.markdown(
+                    f'<div class="composer-chip">Python {st.session_state.python_version}</div>'
+                    f'<div class="composer-chip">{escape(t("level_" + st.session_state.explanation_level.lower(), language))}</div>'
+                    f'<div class="composer-chip">{escape(st.session_state.answer_language)}</div>',
+                    unsafe_allow_html=True,
+                )
+    queued = st.session_state.pop("queued_composer", None)
+    if queued:
+        target, question = queued
+        if target == "ask":
+            process_docs(question, "ask", index, records, api_positions, language)
         else:
-            process_pdf_question(sent, language)
+            process_pdf_question(question, language)
