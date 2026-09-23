@@ -1,6 +1,7 @@
 """RAG sur PDF : embeddings locaux, recherche FAISS et réponse Groq."""
 
 import hashlib
+import importlib
 import os
 import re
 import uuid
@@ -16,7 +17,29 @@ from sentence_transformers import SentenceTransformer
 
 from docs_index import load_index, lookup_api, search
 from styles import inject_custom_css
-from translations import LANGUAGES, t
+import translations as i18n
+
+
+LANGUAGES = i18n.LANGUAGES
+
+
+def t(key, language):
+    """Tolère un ancien module de traductions durant un redéploiement à chaud."""
+    try:
+        return i18n.t(key, language)
+    except KeyError:
+        # Streamlit peut relancer app.py avant de recharger un module déjà importé.
+        importlib.invalidate_caches()
+        try:
+            importlib.reload(i18n)
+            return i18n.t(key, language)
+        except (KeyError, ImportError, SyntaxError):
+            entries = i18n.TEXT.get(language, i18n.TEXT["en"])
+            fallback_key = {"new_short": "new", "commands": "tools",
+                            "ask_suggestions": "try", "docs_query": "question",
+                            "related_short": "related"}.get(key, key)
+            return entries.get(fallback_key, i18n.TEXT["en"].get(
+                fallback_key, key.replace("_", " ").capitalize()))
 
 
 MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
