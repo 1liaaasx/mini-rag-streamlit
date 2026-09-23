@@ -78,14 +78,18 @@ def inject_custom_css(theme):
         background:transparent!important;border-color:transparent!important;}}
 
     /* Champs, selectbox et menus */
-    [data-testid="stTextInput"] input,[data-testid="stTextArea"] textarea,
+    [data-testid="stTextInputRootElement"],[data-testid="stTextInput"] input,
+    [data-testid="stTextArea"] textarea,
     [data-testid="stSelectbox"] [data-baseweb="select"]>div {{background:var(--input-bg)!important;
         color:var(--text)!important;border:1px solid var(--border)!important;
         border-radius:12px!important;caret-color:var(--accent);}}
-    [data-testid="stTextInput"] input {{min-height:44px;}}
-    [data-testid="stTextInput"] input::placeholder,[data-testid="stTextArea"] textarea::placeholder {{
+    [data-testid="stTextInputField"],[data-testid="stTextInput"] input {{min-height:44px;
+        color:var(--text)!important;-webkit-text-fill-color:var(--text)!important;}}
+    [data-testid="stTextInputField"]::placeholder,[data-testid="stTextInput"] input::placeholder,
+    [data-testid="stTextArea"] textarea::placeholder {{
         color:var(--placeholder)!important;opacity:1!important;}}
-    [data-testid="stTextInput"] input:focus,[data-testid="stTextArea"] textarea:focus,
+    [data-testid="stTextInputRootElement"]:focus-within,[data-testid="stTextInput"] input:focus,
+    [data-testid="stTextArea"] textarea:focus,
     [data-testid="stSelectbox"] [data-baseweb="select"]>div:focus-within {{
         border-color:var(--accent)!important;box-shadow:0 0 0 3px rgba(79,124,255,.12)!important;
         outline:none!important;}}
@@ -225,8 +229,16 @@ def inject_custom_css(theme):
     [class*="st-key-composer_shell"]:focus-within {{border-color:var(--accent);
         box-shadow:0 0 0 3px rgba(79,124,255,.12);}}
     [class*="st-key-composer_shell"] [data-testid="stForm"] {{border:0;padding:0;}}
+    [class*="st-key-composer_shell"] [data-testid="stTextInputRootElement"] {{
+        background:var(--input-bg)!important;border:1px solid var(--border)!important;}}
+    [class*="st-key-composer_shell"] [data-testid="stTextInputField"],
     [class*="st-key-composer_shell"] [data-testid="stTextInput"] input {{min-height:44px;
-        background:transparent!important;border:0!important;box-shadow:none!important;padding-left:.35rem;}}
+        background:transparent!important;border:0!important;box-shadow:none!important;
+        color:var(--text)!important;-webkit-text-fill-color:var(--text)!important;padding-left:.35rem;}}
+    [class*="st-key-composer_shell"] [data-testid="stTextInputField"]::placeholder,
+    [class*="st-key-composer_shell"] input::placeholder {{
+        color:var(--placeholder)!important;-webkit-text-fill-color:var(--placeholder)!important;
+        opacity:1!important;}}
     [class*="st-key-composer_shell"] .stFormSubmitButton>button {{width:40px;min-width:40px;
         max-width:40px;height:40px;min-height:40px;padding:0!important;}}
     [class*="st-key-composer_shortcuts"]>[data-testid="stVerticalBlock"] {{flex-direction:row;
